@@ -127,3 +127,27 @@ begin
 end;
 $$;
 
+create or replace function
+test.find_all_test(
+	_id bigint default null,
+	_id1 integer default null,
+	_id2 smallint default null,
+	_id3 integer default null,
+	_id4 integer default null,
+	_id5 integer default null
+)
+returns setof test.Test
+language plpgsql as $$
+begin
+	return query select *
+		from test.Test
+		where
+			(_id is null or id = _id) and
+			(_id1 is null or id1 = _id1) and
+			(_id2 is null or id2 = _id2) and
+			(_id3 is null or id3 = _id3) and
+			(_id4 is null or id4 = _id4) and
+			(_id5 is null or id5 = _id5);
+end;
+$$;
+

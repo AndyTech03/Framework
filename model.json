@@ -7,10 +7,10 @@
 					"pgName": "Test",
 					"jsName": "test",
 					"globalIndex": false,
-					"createScript": false,
-					"readScript": false,
-					"updateScript": false,
-					"deleteScript": false,
+					"createScript": true,
+					"readScript": true,
+					"updateScript": true,
+					"deleteScript": true,
 					"selectAllScript": true,
 					"primaryKeys": [
 						{

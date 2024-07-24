@@ -213,212 +213,258 @@ const generate = () => {
 			)
 			
 			// Add Create function
-			tableQueriesFile.write(
-				`create or replace function\n` +
-				`${schemaName}.create_${tableLowerCaseName}(` + (
-					insertArgs != false ? (
-						`\n` +
-						insertArgs.map(
-							column => `	_${column.pgName} ${column.type}`
-						).join(`,\n`) +
-						`\n`
-					) : ``
-				) +
-				`)\n` +
-				`returns ` + (
-					primaryKeys != false ? (
-						`table(` +
-						primaryKeys.map(
-							column => `${column.pgName} ${getSerialType_orDefault(column.type)}`
-						).join(', ') +
-						`)`
-					) : `void`
-				) +
-				`\n` + 
-				`language plpgsql as $$\n` + (
-					primaryNotArgs != false ? (
-						`declare\n` +
-						primaryNotArgs.map(
-							column => `	_${column.pgName} ${getSerialType_orDefault(column.type)};\n`
-						).join('')
-					) : ``
-				) +
-				`begin\n` + (
-					primarySerial != false ? (
-						primarySerial.map(
-							column => 
-								`	_${column.pgName} := nextval(pg_get_serial_sequence(` +
-								`'${schemaName}.${tablePgName}', '${column.pgName}'));\n`
-						).join('') + `\n`
-					) : ``
-				) + (
-					primaryOrArgs != false ? (
-						`	return query insert into ${schemaName}.${tablePgName} (\n` + 
-						`		` +
-						primaryOrArgs.map(
-							column => `${column.pgName}`
-						).join(', ') +
-						`\n	) values (\n` +
-						`		` +
-						primaryOrArgs.map(
-							column => `_${column.pgName}`
-						).join(', ') +
-						`\n	)` + (
-							primaryKeys != false ? (
-								` returning ` +
-								primaryKeys.map(
-									column => `${tablePgName}.${column.pgName}`
-								).join(', ')
-							) : ``
-						) + `;\n`
-					) : `	-- Nothing to insert...`
-				) +
-				`	return;\n` +
-				`end;\n` +
-				`$$;\n` +
-				`\n`
-			)
+			if (table.createScript) {
+				tableQueriesFile.write(
+					`create or replace function\n` +
+					`${schemaName}.create_${tableLowerCaseName}(` + (
+						insertArgs != false ? (
+							`\n` +
+							insertArgs.map(
+								column => `	_${column.pgName} ${column.type}`
+							).join(`,\n`) +
+							`\n`
+						) : ``
+					) +
+					`)\n` +
+					`returns ` + (
+						primaryKeys != false ? (
+							`table(` +
+							primaryKeys.map(
+								column => `${column.pgName} ${getSerialType_orDefault(column.type)}`
+							).join(', ') +
+							`)`
+						) : `void`
+					) +
+					`\n` + 
+					`language plpgsql as $$\n` + (
+						primaryNotArgs != false ? (
+							`declare\n` +
+							primaryNotArgs.map(
+								column => `	_${column.pgName} ${getSerialType_orDefault(column.type)};\n`
+							).join('')
+						) : ``
+					) +
+					`begin\n` + (
+						primarySerial != false ? (
+							primarySerial.map(
+								column => 
+									`	_${column.pgName} := nextval(pg_get_serial_sequence(` +
+									`'${schemaName}.${tablePgName}', '${column.pgName}'));\n`
+							).join('') + `\n`
+						) : ``
+					) + (
+						primaryOrArgs != false ? (
+							`	return query insert into ${schemaName}.${tablePgName} (\n` + 
+							`		` +
+							primaryOrArgs.map(
+								column => `${column.pgName}`
+							).join(', ') +
+							`\n	) values (\n` +
+							`		` +
+							primaryOrArgs.map(
+								column => `_${column.pgName}`
+							).join(', ') +
+							`\n	)` + (
+								primaryKeys != false ? (
+									` returning ` +
+									primaryKeys.map(
+										column => `${tablePgName}.${column.pgName}`
+									).join(', ')
+								) : ``
+							) + `;\n`
+						) : `	-- Nothing to insert...`
+					) +
+					`	return;\n` +
+					`end;\n` +
+					`$$;\n` +
+					`\n`
+				)
+			}
 
 			// Add Read (select) function
-			tableQueriesFile.write(
-				`create or replace function\n` +
-				`${schemaName}.select_${tableLowerCaseName}(` + (
-					primaryKeys != false ? (
-						`\n` +
-						primaryKeys.map(
-							column => `	_${column.pgName} ${getSerialType_orDefault(column.type)}`
-						).join(`,\n`) +
-						`\n`
-					) : ``
-				) +
-				`)\n` +
-				`returns ${schemaName}.${tablePgName}\n` +
-				`language plpgsql as $$\n` +
-				`begin\n` + (
-					primaryKeys != false ? (
-						`	perform debug.not_found_handler(\n` +
-						`		'${schemaName}.${tablePgName}', exists(\n` +
-						`			select from ${schemaName}.${tablePgName}\n` +
-						`			where\n` +
-						primaryKeys.map(
-							column => `				${column.pgName} = _${column.pgName}`
-						).join(` and\n`) +
-						`\n		), json_build_object(\n` +
-						primaryKeys.map(
-							column => `			'_${column.pgName}', _${column.pgName}`
-						).join(`,\n`) + 
-						`\n		)\n` +
-						`	);\n\n` +
-						`	return (\n` +
-						`		select ${tablePgName}\n` +
-						`		from ${schemaName}.${tablePgName}\n` +
-						`		where\n` +
-						primaryKeys.map(
-							column => `			${column.pgName} = _${column.pgName}`
-						).join(` and\n`) +
-						`\n	);\n`
-					) : (
-						`	-- Can't read with out of primary keys!\n` +
-						`	return null;\n`
-					)
-				) +
-				`end;\n` +
-				`$$;\n` +
-				`\n`
-			)
+			if (table.readScript) {
+				tableQueriesFile.write(
+					`create or replace function\n` +
+					`${schemaName}.select_${tableLowerCaseName}(` + (
+						primaryKeys != false ? (
+							`\n` +
+							primaryKeys.map(
+								column => `	_${column.pgName} ${getSerialType_orDefault(column.type)}`
+							).join(`,\n`) +
+							`\n`
+						) : ``
+					) +
+					`)\n` +
+					`returns ${schemaName}.${tablePgName}\n` +
+					`language plpgsql as $$\n` +
+					`begin\n` + (
+						primaryKeys != false ? (
+							`	perform debug.not_found_handler(\n` +
+							`		'${schemaName}.${tablePgName}', exists(\n` +
+							`			select from ${schemaName}.${tablePgName}\n` +
+							`			where\n` +
+							primaryKeys.map(
+								column => `				${column.pgName} = _${column.pgName}`
+							).join(` and\n`) +
+							`\n		), json_build_object(\n` +
+							primaryKeys.map(
+								column => `			'_${column.pgName}', _${column.pgName}`
+							).join(`,\n`) + 
+							`\n		)\n` +
+							`	);\n\n` +
+							`	return (\n` +
+							`		select ${tablePgName}\n` +
+							`		from ${schemaName}.${tablePgName}\n` +
+							`		where\n` +
+							primaryKeys.map(
+								column => `			${column.pgName} = _${column.pgName}`
+							).join(` and\n`) +
+							`\n	);\n`
+						) : (
+							`	-- Can't read with out of primary keys!\n` +
+							`	return null;\n`
+						)
+					) +
+					`end;\n` +
+					`$$;\n` +
+					`\n`
+				)
+			}
 			
 			// Add Update procedure
-			tableQueriesFile.write(
-				`create or replace procedure\n` +
-				`${schemaName}.update_${tableLowerCaseName}(` + (
-					columns != false ? (
-						`\n` +
-						columns.map(
-							column => (
-								primaryKeys.includes(column) ? (
-									`	_${column.pgName} ${getSerialType_orDefault(column.type)}`
-								) : (
-									`	_${column.pgName} ${getSerialType_orDefault(column.type)}` + 
-									` default null`
+			if (table.updateScript) {
+				tableQueriesFile.write(
+					`create or replace procedure\n` +
+					`${schemaName}.update_${tableLowerCaseName}(` + (
+						columns != false ? (
+							`\n` +
+							columns.map(
+								column => (
+									primaryKeys.includes(column) ? (
+										`	_${column.pgName} ${getSerialType_orDefault(column.type)}`
+									) : (
+										`	_${column.pgName} ${getSerialType_orDefault(column.type)}` + 
+										` default null`
+									)
 								)
-							)
-						).join(`,\n`) +
-						`\n`
-					) : ``
-				) +
-				`)\n` +
-				`language plpgsql as $$\n` +
-				`begin\n` + (
-					notPrimary != false ? (
-						`	perform debug.not_found_handler(\n` +
-						`		'${schemaName}.${tablePgName}', exists(\n` +
-						`			select from ${schemaName}.${tablePgName}\n` +
-						`			where\n` +
-						primaryKeys.map(
-							column => `				${column.pgName} = _${column.pgName}`
-						).join(` and\n`) +
-						`\n		), json_build_object(\n` +
-						primaryKeys.map(
-							column => `			'_${column.pgName}', _${column.pgName}`
-						).join(`,\n`) + 
-						`\n		)\n` +
-						`	);\n\n` +
-						`	update ${schemaName}.${tablePgName} set\n` +
-						notPrimary.map(
-							column => `		${column.pgName} = coalesce(_${column.pgName}, ${column.pgName})`
-						).join(`,\n`) +
-						`\n	where\n` +
-						primaryKeys.map(
-							column => `		${column.pgName} = _${column.pgName}`
-						).join(` and\n`) +
-						`;\n`
-					) : `	-- Nothing to update!\n`
-				) +
-				`end;\n` +
-				`$$;\n` +
-				`\n`
-			)
+							).join(`,\n`) +
+							`\n`
+						) : ``
+					) +
+					`)\n` +
+					`language plpgsql as $$\n` +
+					`begin\n` + (
+						notPrimary != false ? (
+							`	perform debug.not_found_handler(\n` +
+							`		'${schemaName}.${tablePgName}', exists(\n` +
+							`			select from ${schemaName}.${tablePgName}\n` +
+							`			where\n` +
+							primaryKeys.map(
+								column => `				${column.pgName} = _${column.pgName}`
+							).join(` and\n`) +
+							`\n		), json_build_object(\n` +
+							primaryKeys.map(
+								column => `			'_${column.pgName}', _${column.pgName}`
+							).join(`,\n`) + 
+							`\n		)\n` +
+							`	);\n\n` +
+							`	update ${schemaName}.${tablePgName} set\n` +
+							notPrimary.map(
+								column => `		${column.pgName} = coalesce(_${column.pgName}, ${column.pgName})`
+							).join(`,\n`) +
+							`\n	where\n` +
+							primaryKeys.map(
+								column => `		${column.pgName} = _${column.pgName}`
+							).join(` and\n`) +
+							`;\n`
+						) : `	-- Nothing to update!\n`
+					) +
+					`end;\n` +
+					`$$;\n` +
+					`\n`
+				)
+			}
 
 			// Add Delete procedure
-			tableQueriesFile.write(
-				`create or replace procedure\n` +
-				`${schemaName}.delete_${tableLowerCaseName}(` + (
-					primaryKeys != false ? (
-						`\n` +
-						primaryKeys.map(
-							column => `	_${column.pgName} ${getSerialType_orDefault(column.type)}`
-						).join(`,\n`) +
-						`\n`
-					) : ``
-				) +
-				`)\n` +
-				`language plpgsql as $$\n` +
-				`begin\n` + (
-					primaryKeys != false ? (
-						`	perform debug.not_found_handler(\n` +
-						`		'${schemaName}.${tablePgName}', exists(\n` +
-						`			select from ${schemaName}.${tablePgName}\n` +
-						`			where\n` +
-						primaryKeys.map(
-							column => `				${column.pgName} = _${column.pgName}`
-						).join(` and\n`) +
-						`\n		), json_build_object(\n` +
-						primaryKeys.map(
-							column => `			'_${column.pgName}', _${column.pgName}`
-						).join(`,\n`) + 
-						`\n		)\n` +
-						`	);\n\n` +
-						`	delete from ${schemaName}.${tablePgName} where\n` +
-						primaryKeys.map(
-							column => `		${column.pgName} = _${column.pgName}`
-						).join(` and\n`) +
-						`;\n`
-					) : `	-- Can't delete with out of primary keys!\n`
-				) +
-				`end;\n` +
-				`$$;\n` +
-				`\n`
-			)
+			if (table.deleteScript) {
+				tableQueriesFile.write(
+					`create or replace procedure\n` +
+					`${schemaName}.delete_${tableLowerCaseName}(` + (
+						primaryKeys != false ? (
+							`\n` +
+							primaryKeys.map(
+								column => `	_${column.pgName} ${getSerialType_orDefault(column.type)}`
+							).join(`,\n`) +
+							`\n`
+						) : ``
+					) +
+					`)\n` +
+					`language plpgsql as $$\n` +
+					`begin\n` + (
+						primaryKeys != false ? (
+							`	perform debug.not_found_handler(\n` +
+							`		'${schemaName}.${tablePgName}', exists(\n` +
+							`			select from ${schemaName}.${tablePgName}\n` +
+							`			where\n` +
+							primaryKeys.map(
+								column => `				${column.pgName} = _${column.pgName}`
+							).join(` and\n`) +
+							`\n		), json_build_object(\n` +
+							primaryKeys.map(
+								column => `			'_${column.pgName}', _${column.pgName}`
+							).join(`,\n`) + 
+							`\n		)\n` +
+							`	);\n\n` +
+							`	delete from ${schemaName}.${tablePgName} where\n` +
+							primaryKeys.map(
+								column => `		${column.pgName} = _${column.pgName}`
+							).join(` and\n`) +
+							`;\n`
+						) : `	-- Can't delete with out of primary keys!\n`
+					) +
+					`end;\n` +
+					`$$;\n` +
+					`\n`
+				)
+			}
+
+			// Add Selec All function
+			if (table.selectAllScript) {
+				tableQueriesFile.write(
+					`create or replace function\n` +
+					`${schemaName}.find_all_${tableLowerCaseName}(` + (
+						columns != false ? (
+							`\n` +
+							columns.map(
+								column => 
+									`	_${column.pgName} ${getSerialType_orDefault(column.type)}` +
+									` default null`
+							).join(`,\n`) +
+							`\n`
+						) : ``
+					) +
+					`)\n` +
+					`returns setof ${schemaName}.${tablePgName}\n` +
+					`language plpgsql as $$\n` +
+					`begin\n` + (
+						columns != false ? (
+							`	return query select *\n` +
+							`		from ${schemaName}.${tablePgName}\n` +
+							`		where\n` +
+							columns.map(
+								column => `			(_${column.pgName} is null or ${column.pgName} = _${column.pgName})`
+							).join(` and\n`) +
+							`;\n`
+						) : (
+							`	-- Nothing to select!\n` +
+							`	return next null;\n`
+						)
+					) +
+					`end;\n` +
+					`$$;\n` +
+					`\n`
+				)
+			}
 		}
 
 	}
