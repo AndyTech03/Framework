@@ -1,0 +1,140 @@
+{
+	"schemas": [
+		{
+			"name": "test",
+			"tables": [
+				{
+					"pgName": "Test",
+					"jsName": "test",
+					"globalIndex": false,
+					"createScript": false,
+					"readScript": false,
+					"updateScript": false,
+					"deleteScript": false,
+					"selectAllScript": true,
+					"primaryKeys": [
+						{
+							"pgName": "id",
+							"jsName": "ID",
+							"type": "bigserial"
+						},
+						{
+							"pgName": "id1",
+							"jsName": "ID1",
+							"type": "serial"
+						},
+						{
+							"pgName": "id2",
+							"jsName": "ID2",
+							"type": "smallserial"
+						},
+						{
+							"pgName": "id3",
+							"jsName": "ID3",
+							"type": "integer"
+						},
+						{
+							"pgName": "id4",
+							"jsName": "ID4",
+							"type": "integer",
+							"default": 1
+						},
+						{
+							"pgName": "id5",
+							"jsName": "ID5",
+							"type": "serial"
+						}
+					]
+				},
+				{
+					"pgName": "Link_Type",
+					"jsName": "linkType",
+					"globalIndex": false,
+					"createScript": false,
+					"readScript": false,
+					"updateScript": false,
+					"deleteScript": false,
+					"selectAllScript": true,
+					"primaryKeys": [
+						{
+							"pgName": "id",
+							"jsName": "ID",
+							"type": "smallserial"
+						}
+					],
+					"uniqueKeys": [
+						{
+							"columns": [
+								{
+									"pgName": "slug",
+									"jsName": "slug",
+									"type": "text"
+								}
+							]
+						}
+					],
+					"columns": [
+						{
+							"pgName": "title",
+							"jsName": "title",
+							"type": "text"
+						},
+						{
+							"pgName": "description",
+							"jsName": "description",
+							"type": "text",
+							"default": "'Test'"
+						}
+					]
+				},
+				{
+					"pgName": "Hiper_Link",
+					"jsName": "hiperLink",
+					"globalPrimaryKeys": false,
+					"createScript": true,
+					"readScript": true,
+					"updateScript": true,
+					"deleteScript": true,
+					"selectAllScript": false,
+					"primaryKeys": [
+						{
+							"pgName": "id",
+							"jsName": "ID",
+							"type": "integer"
+						}
+					],
+					"foreignKeys": [
+						{
+							"columns": [
+								{
+									"pgName": "type_id",
+									"jsName": "typeID", 
+									"type": "integer"
+								}
+							],
+							"references": {
+								"schema": "media",
+								"table": "Link_Type",
+								"columns": [
+									"id"
+								]
+							}
+						}
+					],
+					"columns": [
+						{
+							"pgName": "link_url",
+							"jsName": "linkURL",
+							"type": "text"
+						},
+						{
+							"pgName": "extra_data",
+							"jsName": "extraData",
+							"type": "json"
+						}
+					]
+				}
+			]
+		}
+	]
+}
