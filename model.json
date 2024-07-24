@@ -1,11 +1,52 @@
 {
 	"schemas": [
 		{
-			"name": "test",
+			"name": "notification",
 			"tables": [
 				{
-					"pgName": "Test",
-					"jsName": "test",
+					"pgName": "Notification_Type",
+					"jsName": "notificationType",
+					"globalIndex": false,
+					"createScript": true,
+					"readScript": true,
+					"updateScript": true,
+					"deleteScript": true,
+					"selectAllScript": true,
+					"primaryKeys": [
+						{
+							"pgName": "id",
+							"jsName": "ID",
+							"type": "smallserial"
+						}
+					],
+					"uniqueKeys": [
+						{
+							"columnsPgNames": [
+								"slug"
+							]
+						}
+					],
+					"columns": [
+						{
+							"pgName": "slug",
+							"jsName": "slug",
+							"type": "text"
+						},
+						{
+							"pgName": "title",
+							"jsName": "title",
+							"type": "text"
+						},
+						{
+							"pgName": "description",
+							"jsName": "description",
+							"type": "text"
+						}
+					]
+				},
+				{
+					"pgName": "Notification",
+					"jsName": "notification",
 					"globalIndex": false,
 					"createScript": true,
 					"readScript": true,
@@ -17,90 +58,6 @@
 							"pgName": "id",
 							"jsName": "ID",
 							"type": "bigserial"
-						},
-						{
-							"pgName": "id1",
-							"jsName": "ID1",
-							"type": "serial"
-						},
-						{
-							"pgName": "id2",
-							"jsName": "ID2",
-							"type": "smallserial"
-						},
-						{
-							"pgName": "id3",
-							"jsName": "ID3",
-							"type": "integer"
-						},
-						{
-							"pgName": "id4",
-							"jsName": "ID4",
-							"type": "integer",
-							"default": 1
-						},
-						{
-							"pgName": "id5",
-							"jsName": "ID5",
-							"type": "serial"
-						}
-					]
-				},
-				{
-					"pgName": "Link_Type",
-					"jsName": "linkType",
-					"globalIndex": false,
-					"createScript": false,
-					"readScript": false,
-					"updateScript": false,
-					"deleteScript": false,
-					"selectAllScript": true,
-					"primaryKeys": [
-						{
-							"pgName": "id",
-							"jsName": "ID",
-							"type": "smallserial"
-						}
-					],
-					"uniqueKeys": [
-						{
-							"columns": [
-								{
-									"pgName": "slug",
-									"jsName": "slug",
-									"type": "text"
-								}
-							]
-						}
-					],
-					"columns": [
-						{
-							"pgName": "title",
-							"jsName": "title",
-							"type": "text"
-						},
-						{
-							"pgName": "description",
-							"jsName": "description",
-							"type": "text",
-							"default": "'Test'"
-						}
-					]
-				},
-				{
-					"pgName": "Hiper_Link",
-					"jsName": "hiperLink",
-					"globalPrimaryKeys": false,
-					"createScript": true,
-					"readScript": true,
-					"updateScript": true,
-					"deleteScript": true,
-					"selectAllScript": false,
-					"primaryKeys": [
-						{
-							"pgName": "id",
-							"jsName": "ID",
-							"type": "integer"
 						}
 					],
 					"foreignKeys": [
@@ -108,13 +65,13 @@
 							"columns": [
 								{
 									"pgName": "type_id",
-									"jsName": "typeID", 
-									"type": "integer"
+									"jsName": "typeID",
+									"type": "smallint"
 								}
 							],
 							"references": {
-								"schema": "media",
-								"table": "Link_Type",
+								"schema": "notification",
+								"table": "Notification_Type",
 								"columns": [
 									"id"
 								]
@@ -123,13 +80,133 @@
 					],
 					"columns": [
 						{
-							"pgName": "link_url",
-							"jsName": "linkURL",
-							"type": "text"
+							"pgName": "source",
+							"jsName": "source",
+							"type": "json"
 						},
 						{
-							"pgName": "extra_data",
-							"jsName": "extraData",
+							"pgName": "content",
+							"jsName": "content",
+							"type": "json"
+						},
+						{
+							"pgName": "notification_date",
+							"jsName": "notificationDate",
+							"type": "timestamp without time zone"
+						}
+					]
+				},
+				{
+					"pgName": "Account_Notification",
+					"jsName": "accountNotification",
+					"globalIndex": false,
+					"createScript": true,
+					"readScript": true,
+					"updateScript": true,
+					"deleteScript": true,
+					"selectAllScript": true,
+					"primaryKeys": [
+						{
+							"pgName": "id",
+							"jsName": "ID",
+							"type": "bigserial"
+						}
+					],
+					"foreignKeys": [
+						{
+							"columns": [
+								{
+									"pgName": "receiver_aid",
+									"jsName": "receiverAID",
+									"type": "bigint"
+								}
+							],
+							"references": {
+								"schema": "account",
+								"table": "Account",
+								"columns": [
+									"id"
+								]
+							}
+						},
+						{
+							"columns": [
+								{
+									"pgName": "notification_id",
+									"jsName": "notificationID",
+									"type": "bigint"
+								}
+							],
+							"references": {
+								"schema": "notification",
+								"table": "Notification",
+								"columns": [
+									"id"
+								]
+							}
+						}
+					],
+					"uniqueKeys": [
+						{
+							"columnsPgNames": [
+								"notification_id",
+								"receiver_aid"
+							]
+						}
+					],
+					"columns": [
+						{
+							"pgName": "status",
+							"jsName": "status",
+							"type": "json"
+						}
+					]
+				},
+				{
+					"pgName": "Account_Notification_Settings",
+					"jsName": "accountNotificationSettings",
+					"globalIndex": false,
+					"createScript": true,
+					"readScript": true,
+					"updateScript": true,
+					"deleteScript": true,
+					"selectAllScript": true,
+					"primaryKeys": [
+						{
+							"pgName": "id",
+							"jsName": "ID",
+							"type": "bigserial"
+						}
+					],
+					"foreignKeys": [
+						{
+							"columns": [
+								{
+									"pgName": "account_id",
+									"jsName": "accountID",
+									"type": "bigint"
+								}
+							],
+							"references": {
+								"schema": "account",
+								"table": "Account",
+								"columns": [
+									"id"
+								]
+							}
+						}
+					],
+					"uniqueKeys": [
+						{
+							"columnsPgNames": [
+								"account_id"
+							]
+						}
+					],
+					"columns": [
+						{
+							"pgName": "settings",
+							"jsName": "settings",
 							"type": "json"
 						}
 					]

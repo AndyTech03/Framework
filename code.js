@@ -140,12 +140,6 @@ const generate = () => {
 				}
 			}
 			// Push to columns
-			for (const uniqueKey of uniqueKeys) {
-				for (const column of uniqueKey.columns) {
-					columns.push(column)
-				}
-			}
-			// Push to columns
 			for (const column of table.columns || []) {
 				columns.push(column)
 			}
@@ -177,9 +171,7 @@ const generate = () => {
 									uniqueKeys.map(
 										key => 
 											`	unique (` +
-											key.columns.map(
-												column => column.pgName
-											).join(', ') +
+											key.columnsPgNames.join(', ') +
 											`),\n`
 									).join('')
 								) : '' 
