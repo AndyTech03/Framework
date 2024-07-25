@@ -1,12 +1,32 @@
 {
 	"schemas": [
 		{
+			"name": "account",
+			"tables": [
+				{
+					"pgName": "Account",
+					"jsName": "account",
+					"createScript": true,
+					"readScript": true,
+					"updateScript": true,
+					"deleteScript": true,
+					"selectAllScript": true,
+					"primaryKeys": [
+						{
+							"pgName": "id",
+							"jsName": "ID",
+							"type": "bigserial"
+						}
+					]
+				}
+			]
+		},
+		{
 			"name": "notification",
 			"tables": [
 				{
 					"pgName": "Notification_Type",
 					"jsName": "notificationType",
-					"globalIndex": false,
 					"createScript": true,
 					"readScript": true,
 					"updateScript": true,
@@ -47,7 +67,6 @@
 				{
 					"pgName": "Notification",
 					"jsName": "notification",
-					"globalIndex": false,
 					"createScript": true,
 					"readScript": true,
 					"updateScript": true,
@@ -69,7 +88,7 @@
 									"type": "smallint"
 								}
 							],
-							"references": {
+							"reference": {
 								"schema": "notification",
 								"table": "Notification_Type",
 								"columns": [
@@ -99,7 +118,6 @@
 				{
 					"pgName": "Account_Notification",
 					"jsName": "accountNotification",
-					"globalIndex": false,
 					"createScript": true,
 					"readScript": true,
 					"updateScript": true,
@@ -121,7 +139,7 @@
 									"type": "bigint"
 								}
 							],
-							"references": {
+							"reference": {
 								"schema": "account",
 								"table": "Account",
 								"columns": [
@@ -137,7 +155,7 @@
 									"type": "bigint"
 								}
 							],
-							"references": {
+							"reference": {
 								"schema": "notification",
 								"table": "Notification",
 								"columns": [
@@ -165,7 +183,6 @@
 				{
 					"pgName": "Account_Notification_Settings",
 					"jsName": "accountNotificationSettings",
-					"globalIndex": false,
 					"createScript": true,
 					"readScript": true,
 					"updateScript": true,
@@ -187,7 +204,7 @@
 									"type": "bigint"
 								}
 							],
-							"references": {
+							"reference": {
 								"schema": "account",
 								"table": "Account",
 								"columns": [

@@ -4,7 +4,7 @@ const accountNotificationRoutes = require('./generated/accountNotification')
 const accountNotificationSettingsRoutes = require('./generated/accountNotificationSettings')
 
 
-const notificationRoutes = (fastify, _, done) => {
+const notificationRouter = (fastify, _, done) => {
 	notificationTypeRoutes(fastify)
 	notificationRoutes(fastify)
 	accountNotificationRoutes(fastify)
@@ -14,4 +14,4 @@ const notificationRoutes = (fastify, _, done) => {
 }
 
 
-module.exports = notificationRoutes
+module.exports = notificationRouter
