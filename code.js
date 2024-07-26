@@ -21,7 +21,53 @@ const getSerialType_orDefault = (type) => {
 	}
 }
 
+const getDateTimeString = (date = undefined) => {
+	if (date === undefined)
+		date = new Date()
+	return date.toISOString().split('.')[0] + 'Z'
+}
+
+const getColumnMockValue = (column) => {
+	const type = getSerialType_orDefault(column.type)
+	switch (type) {
+		case 'bigint':
+		case 'integer':
+		case 'smallint':
+			return 1
+		case 'text':
+			return 'SomeText'
+		case 'json':
+			return '{"data": "text"}'
+		case 'timestamp without time zone':
+			return getDateTimeString()
+		default:
+			return type
+	}
+}
+
+const columns_toJson = (columns) => 
+	JSON.stringify(
+		columns.reduce((result, column, i) => 
+			({...result, [column.jsName]: getColumnMockValue(column)}), {}
+		), 
+		null, '\t'
+	)
+
 const capitalizeName = (name) => name[0].toUpperCase() + name.slice(1)
+
+const decodeUrlObject = (obj) => {
+	const entries = Object.keys(obj).map(
+		key => ({[key]: decodeURIComponent(obj[key])})
+	)
+	return Object.assign({}, ...entries)
+}
+
+const pgRow_to_jsObject = (pgRow, jsKeys) => {
+	const entries = Object.keys(pgRow).map(
+		key => ({[jsKeys[key]]: pgRow[key]})
+	)
+	return Object.assign({}, ...entries)
+}
 
 const generate = () => {
 	const model = JSON.parse(fs.readFileSync('model.json').toString())
@@ -62,17 +108,31 @@ const generate = () => {
 	}
 	let req_id = 1
 	let fld_id = 1
+	let pair_id = 1
 	let foreignKeys = []
-	let globalPrimaryKeys = []
 
 	// Create root-dirs
 	mkDir('./src/doc')
 	mkDir('./src/pgsql')
 	mkDir('./src/routes')
 	mkDir('./src/tests')
+	mkDir('./src/utils')
 
 	const foreignKeysFile = fs.createWriteStream(`./src/pgsql/foreignKeys.pg.sql`)
 	const insomniaFile = fs.createWriteStream(`./src/doc/!Insomnia.json`)
+	const utilsFile = fs.createWriteStream(`./src/utils/generated.js`)
+	const utilsFuncs = [pgRow_to_jsObject, decodeUrlObject]
+	utilsFile.write(
+		utilsFuncs.map(
+			func => `const ${func.name} = ${func}`
+		).join('\n\n') + `\n` +
+		`\n\n` +
+		`module.exports = {\n` +
+		utilsFuncs.map(
+			func => `	${func.name}`
+		).join(',\n') + `\n` +
+		`}\n\n`
+	)
 	
 	for (const schema of model.schemas){
 		const schemaFldId = `fld_${fld_id++}`
@@ -481,8 +541,8 @@ const generate = () => {
 								`\n` +
 								columns.map(
 									column => 
-										`	_${column.pgName} ${getSerialType_orDefault(column.type)}` +
-										` default null`
+										`	_${column.pgName} text` +
+										` default ''`
 								).join(`,\n`) +
 								`\n`
 							) : ``
@@ -496,7 +556,7 @@ const generate = () => {
 								`		from ${schemaName}.${tablePgName}\n` +
 								`		where\n` +
 								columns.map(
-									column => `			(_${column.pgName} is null or ${column.pgName} = _${column.pgName})`
+									column => `			(_${column.pgName} is null or _${column.pgName} = '' or (${column.pgName}::text ~ ('^' || _${column.pgName} || '$')))`
 								).join(` and\n`) +
 								`;\n`
 							) : (
@@ -513,6 +573,7 @@ const generate = () => {
 			{	// Fastify.js
 				tableRouterFile.write(
 					`const { errorsHandler } = require('../../../errors')\n` +
+					`const { pgRow_to_jsObject, decodeUrlObject } = require('../../../utils/generated')` +
 					`\n\n` +
 					`const routes = (fastify) => {\n\t` + (
 						[
@@ -548,9 +609,9 @@ const generate = () => {
 									`	))\n`
 								) : ``
 							),
+							`\n`,
 							(
 								table.selectAllScript ? (
-									`\n` + 
 									`	fastify.get('/${tableJsName}/getAll', async (request, reply) =>\n` +
 									`		selectAll${capitalizeName(tableJsName)}(\n` +
 									`			fastify, request, reply\n` +
@@ -571,7 +632,7 @@ const generate = () => {
 									`\n` +
 									`	with (request.body) {\n` +
 									`		createQuery = {\n` +
-									`			text: 	'select * from ${schemaName}.create_${tablePgName}(\\n' +\n` +
+									`			text: 	'select * from ${schemaName}.create_${tableLowerCaseName}(\\n' +\n` +
 									`					'	` +
 									insertArgs.map(
 										(column, index) => `$${index + 1}::${getSerialType_orDefault(column.type)}`
@@ -586,11 +647,172 @@ const generate = () => {
 									`		}\n` +
 									`	}\n` +
 									`\n` +
-									`	client.query(createQuery)\n` +
-									`		.then((result) => \n` +
-									`			reply.send(result.rows[0]))\n` +
-									`		.catch(error =>\n` +
-									`			errorsHandler(reply, error)\n` +
+									`	client.query(\n` +
+									`		createQuery\n` +
+									`	).then((result) =>\n` +
+									`		reply.send(result.rows[0])\n` +
+									`	).then((row) =>\n` +
+									`		pgRow_to_jsObject(row, {\n` +
+									insertArgs.map(
+										column => `			${column.pgName}: '${column.jsName}'`
+									).join(',\n') + `\n` +
+									`	})).catch(error =>\n` +
+									`		errorsHandler(reply, error)\n` +
+									`	)\n` +
+									`\n` +
+									`	return reply\n` +
+									`}\n`
+								) : ``
+							),
+							(
+								table.readScript ? (
+									`const read${capitalizeName(tableJsName)} = async (fastify, request, reply) => {\n` +
+									`	let readQuery;\n` +
+									`	const client = fastify.postgresql.client\n` +
+									`\n` +
+									`	with (request.query) {\n` +
+									`		readQuery = {\n` +
+									`			text: 	'select * from ${schemaName}.select_${tableLowerCaseName}(\\n' +\n` +
+									`					'	` +
+									primaryKeys.map(
+										(column, index) => `$${index + 1}::${getSerialType_orDefault(column.type)}`
+									).join(`, `) + `\\n' +\n` +
+									`					');',\n` +
+									`			values: [\n` +
+									`				` +
+									primaryKeys.map(
+										column => `${column.jsName}`
+									).join(`, `) + `\n` +
+									`			]\n` +
+									`		}\n` +
+									`	}\n` +
+									`\n` +
+									`	client.query(\n` +
+									`		readQuery\n` +
+									`	).then((result) =>\n` +
+									`		reply.send(result.rows[0])\n` +
+									`	).then((row) =>\n` +
+									`		pgRow_to_jsObject(row, {\n` +
+									primaryKeys.map(
+										column => `			${column.pgName}: '${column.jsName}'`
+									).join(',\n') + `\n` +
+									`	})).catch(error =>\n` +
+									`		errorsHandler(reply, error)\n` +
+									`	)\n` +
+									`\n` +
+									`	return reply\n` +
+									`}\n`
+								) : ``
+							),
+							(
+								table.updateScript ? (
+									`const update${capitalizeName(tableJsName)} = async (fastify, request, reply) => {\n` +
+									`	let updateQuery;\n` +
+									`	const client = fastify.postgresql.client\n` +
+									`\n` +
+									`	with (request.body) {\n` +
+									`		updateQuery = {\n` +
+									`			text: 	'call ${schemaName}.update_${tableLowerCaseName}(\\n' +\n` +
+									`					'	` +
+									columns.map(
+										(column, index) => `$${index + 1}::${getSerialType_orDefault(column.type)}`
+									).join(`, `) + `\\n' +\n` +
+									`					');',\n` +
+									`			values: [\n` +
+									`				` +
+									columns.map(
+										column => `${column.jsName}`
+									).join(`, `) + `\n` +
+									`			]\n` +
+									`		}\n` +
+									`	}\n` +
+									`\n` +
+									`	client.query(\n` +
+									`		updateQuery\n` +
+									`	).then((result) =>\n` +
+									`		reply.send('OK')\n` +
+									`	).catch(error =>\n` +
+									`		errorsHandler(reply, error)\n` +
+									`	)\n` +
+									`\n` +
+									`	return reply\n` +
+									`}\n`
+								) : ``
+							),
+							(
+								table.updateScript ? (
+									`const delete${capitalizeName(tableJsName)} = async (fastify, request, reply) => {\n` +
+									`	let deleteQuery;\n` +
+									`	const client = fastify.postgresql.client\n` +
+									`\n` +
+									`	with (request.body) {\n` +
+									`		deleteQuery = {\n` +
+									`			text: 	'call ${schemaName}.delete_${tableLowerCaseName}(\\n' +\n` +
+									`					'	` +
+									primaryKeys.map(
+										(column, index) => `$${index + 1}::${getSerialType_orDefault(column.type)}`
+									).join(`, `) + `\\n' +\n` +
+									`					');',\n` +
+									`			values: [\n` +
+									`				` +
+									primaryKeys.map(
+										column => `${column.jsName}`
+									).join(`, `) + `\n` +
+									`			]\n` +
+									`		}\n` +
+									`	}\n` +
+									`\n` +
+									`	client.query(\n` +
+									`		deleteQuery\n` +
+									`	).then((result) =>\n` +
+									`		reply.send('OK')\n` +
+									`	).catch(error =>\n` +
+									`		errorsHandler(reply, error)\n` +
+									`	)\n` +
+									`\n` +
+									`	return reply\n` +
+									`}\n`
+								) : ``
+							),
+							`\n`,
+							(
+								table.selectAllScript ? (
+									`const selectAll${capitalizeName(tableJsName)} = async (fastify, request, reply) => {\n` +
+									`	let query;\n` +
+									`	const client = fastify.postgresql.client\n` +
+									`\n` +
+									`	with (decodeUrlObject(request.query)) {\n` +
+									`		query = {\n` +
+									`			text: 	'select * from ${schemaName}.find_all_${tableLowerCaseName}(\\n' +\n` +
+									`					'	` +
+									columns.map(
+										(column, index) => `$${index + 1}`
+									).join(`, `) + `\\n' +\n` +
+									`					');',\n` +
+									`			values: [\n` +
+									`				` +
+									columns.map(
+										column => `${column.jsName}`
+									).join(`, `) + `\n` +
+									`			]\n` +
+									`		}\n` +
+									`	}\n` +
+									`	console.log(query)\n` +
+									`\n` +
+									`	client.query(\n` +
+									`		query\n` +
+									`	).then((result) =>\n` +
+									`		result.rows\n` +
+									`	).then((rows) =>\n` +
+									`		rows.map((row) =>\n` +
+									`			pgRow_to_jsObject(row, {\n` +
+									primaryKeys.map(
+										column => `				${column.pgName}: '${column.jsName}'`
+									).join(',\n') + `\n` +
+									`	}))).then((result) =>\n` +
+									`		reply.send(result)` +
+									`	).catch(error =>\n` +
+									`		errorsHandler(reply, error)\n` +
 									`	)\n` +
 									`\n` +
 									`	return reply\n` +
@@ -598,7 +820,7 @@ const generate = () => {
 								) : ``
 							)
 						].filter(s => s != '').join('\n').trim()
-					) +
+					) + `\n` +
 					`\n\n` +
 					`module.exports = routes`
 				)
@@ -618,19 +840,14 @@ const generate = () => {
 								{
 									_id: `req_${req_id++}`,
 									_type: 'request',
-									'parentId': `fld_${fld_id}`,
-									url: `{{_.host}}/${schemaName}/${tableJsName}`,
+									parentId: tableFldId,
 									name: `Create ${capitalizeName(tableJsName)}`,
 									description: `Call insert function, returning primary keys`,
 									method: `post`,
+									url: `{{_.host}}/${schemaName}/${tableJsName}`,
 									body: {
 										mimeType: `application/json`,
-										text: JSON.stringify(
-											insertArgs.reduce((result, column, i) => {
-											if (i == 1)
-												result = {[result.jsName]: result.type}
-											return {...result, [column.jsName]: column.type}
-										}, {}), null, '\t')
+										text: columns_toJson(insertArgs)
 									},
 									headers: [
 										{
@@ -644,8 +861,124 @@ const generate = () => {
 									]
 								}
 							) : null
+						),
+						(
+							table.readScript ? (
+								{
+									_id: `req_${req_id++}`,
+									_type: 'request',
+									parentId: tableFldId,
+									name: `Read ${capitalizeName(tableJsName)}`,
+									description: `Call select function, returning all columns`,
+									method: `get`,
+									url: `{{_.host}}/${schemaName}/${tableJsName}`,
+									body: {},
+									parameters: primaryKeys.map(
+										column => ({
+											id: `pair_${pair_id++}`,
+											name: column.jsName,
+											value: getColumnMockValue(column).toString(),
+											description: '',
+											disabled: false
+										})
+									),
+									headers: [
+										{
+											name: 'User-Agent',
+											value: 'insomnia/9.3.2'
+										}
+									]
+								}
+							) : null
+						),
+						(
+							table.updateScript ? (
+								{
+									_id: `req_${req_id++}`,
+									_type: 'request',
+									parentId: tableFldId,
+									name: `Update ${capitalizeName(tableJsName)}`,
+									description: `Call update procedure, returning 'OK' message`,
+									method: `put`,
+									url: `{{_.host}}/${schemaName}/${tableJsName}`,
+									body: {
+										mimeType: `application/json`,
+										text: columns_toJson(columns)
+									},
+									headers: [
+										{
+											name: "Content-Type",
+											value: "application/json"
+										},
+										{
+											name: 'User-Agent',
+											value: 'insomnia/9.3.2'
+										}
+									]
+								}
+							) : null
+						),
+						(
+							table.deleteScript ? (
+								{
+									_id: `req_${req_id++}`,
+									_type: 'request',
+									parentId: tableFldId,
+									name: `Delete ${capitalizeName(tableJsName)}`,
+									description: `Call delete procedure, returning 'OK' message`,
+									method: `delete`,
+									url: `{{_.host}}/${schemaName}/${tableJsName}`,
+									body: {
+										mimeType: `application/json`,
+										text: columns_toJson(primaryKeys)
+									},
+									headers: [
+										{
+											name: "Content-Type",
+											value: "application/json"
+										},
+										{
+											name: 'User-Agent',
+											value: 'insomnia/9.3.2'
+										}
+									]
+								}
+							) : null
+						),
+						(
+							table.selectAllScript ? (
+								{
+									_id: `req_${req_id++}`,
+									_type: 'request',
+									parentId: tableFldId,
+									name: `Find ${capitalizeName(tableJsName)}`,
+									description: `Call FindAll function, returning array of json`,
+									method: `get`,
+									url: `{{_.host}}/${schemaName}/${tableJsName}/getAll`,
+									body: {},
+									parameters: columns.map(
+										column => ({
+											id: `pair_${pair_id++}`,
+											name: column.jsName,
+											value: getColumnMockValue(column).toString(),
+											description: '',
+											disabled: false
+										})
+									),
+									headers: [
+										{
+											name: "Content-Type",
+											value: "application/json"
+										},
+										{
+											name: 'User-Agent',
+											value: 'insomnia/9.3.2'
+										}
+									]
+								}
+							) : null
 						)
-					].filter(r => r != null)
+					].filter(r => r != null).reverse()
 				)
 
 			}

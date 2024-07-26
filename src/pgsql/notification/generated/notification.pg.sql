@@ -100,11 +100,11 @@ $$;
 
 create or replace function
 notification.find_all_notification(
-	_id bigint default null,
-	_type_id smallint default null,
-	_source json default null,
-	_content json default null,
-	_notification_date timestamp without time zone default null
+	_id text default '',
+	_type_id text default '',
+	_source text default '',
+	_content text default '',
+	_notification_date text default ''
 )
 returns setof notification.Notification
 language plpgsql as $$
@@ -112,11 +112,11 @@ begin
 	return query select *
 		from notification.Notification
 		where
-			(_id is null or id = _id) and
-			(_type_id is null or type_id = _type_id) and
-			(_source is null or source = _source) and
-			(_content is null or content = _content) and
-			(_notification_date is null or notification_date = _notification_date);
+			(_id is null or _id = '' or (id::text ~ ('^' || _id || '$'))) and
+			(_type_id is null or _type_id = '' or (type_id::text ~ ('^' || _type_id || '$'))) and
+			(_source is null or _source = '' or (source::text ~ ('^' || _source || '$'))) and
+			(_content is null or _content = '' or (content::text ~ ('^' || _content || '$'))) and
+			(_notification_date is null or _notification_date = '' or (notification_date::text ~ ('^' || _notification_date || '$')));
 end;
 $$;
 

@@ -97,10 +97,10 @@ $$;
 
 create or replace function
 notification.find_all_notification_type(
-	_id smallint default null,
-	_slug text default null,
-	_title text default null,
-	_description text default null
+	_id text default '',
+	_slug text default '',
+	_title text default '',
+	_description text default ''
 )
 returns setof notification.Notification_Type
 language plpgsql as $$
@@ -108,10 +108,10 @@ begin
 	return query select *
 		from notification.Notification_Type
 		where
-			(_id is null or id = _id) and
-			(_slug is null or slug = _slug) and
-			(_title is null or title = _title) and
-			(_description is null or description = _description);
+			(_id is null or _id = '' or (id::text ~ ('^' || _id || '$'))) and
+			(_slug is null or _slug = '' or (slug::text ~ ('^' || _slug || '$'))) and
+			(_title is null or _title = '' or (title::text ~ ('^' || _title || '$'))) and
+			(_description is null or _description = '' or (description::text ~ ('^' || _description || '$')));
 end;
 $$;
 

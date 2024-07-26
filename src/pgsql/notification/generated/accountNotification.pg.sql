@@ -97,10 +97,10 @@ $$;
 
 create or replace function
 notification.find_all_account_notification(
-	_id bigint default null,
-	_receiver_aid bigint default null,
-	_notification_id bigint default null,
-	_status json default null
+	_id text default '',
+	_receiver_aid text default '',
+	_notification_id text default '',
+	_status text default ''
 )
 returns setof notification.Account_Notification
 language plpgsql as $$
@@ -108,10 +108,10 @@ begin
 	return query select *
 		from notification.Account_Notification
 		where
-			(_id is null or id = _id) and
-			(_receiver_aid is null or receiver_aid = _receiver_aid) and
-			(_notification_id is null or notification_id = _notification_id) and
-			(_status is null or status = _status);
+			(_id is null or _id = '' or (id::text ~ ('^' || _id || '$'))) and
+			(_receiver_aid is null or _receiver_aid = '' or (receiver_aid::text ~ ('^' || _receiver_aid || '$'))) and
+			(_notification_id is null or _notification_id = '' or (notification_id::text ~ ('^' || _notification_id || '$'))) and
+			(_status is null or _status = '' or (status::text ~ ('^' || _status || '$')));
 end;
 $$;
 

@@ -17,6 +17,22 @@ end;
 $$;
 
 
+alter table account.Account
+add constraint fkey_account_Account__state_id
+foreign key (
+	state_id
+) references account.Account_State (
+	id
+);
+
+alter table account.Account
+add constraint fkey_account_Account__role_id
+foreign key (
+	role_id
+) references account.Account_Role (
+	id
+);
+
 alter table notification.Notification
 add constraint fkey_notification_Notification__type_id
 foreign key (

@@ -94,9 +94,9 @@ $$;
 
 create or replace function
 notification.find_all_account_notification_settings(
-	_id bigint default null,
-	_account_id bigint default null,
-	_settings json default null
+	_id text default '',
+	_account_id text default '',
+	_settings text default ''
 )
 returns setof notification.Account_Notification_Settings
 language plpgsql as $$
@@ -104,9 +104,9 @@ begin
 	return query select *
 		from notification.Account_Notification_Settings
 		where
-			(_id is null or id = _id) and
-			(_account_id is null or account_id = _account_id) and
-			(_settings is null or settings = _settings);
+			(_id is null or _id = '' or (id::text ~ ('^' || _id || '$'))) and
+			(_account_id is null or _account_id = '' or (account_id::text ~ ('^' || _account_id || '$'))) and
+			(_settings is null or _settings = '' or (settings::text ~ ('^' || _settings || '$')));
 end;
 $$;
 
