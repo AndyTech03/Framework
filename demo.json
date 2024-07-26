@@ -1,0 +1,57 @@
+{
+	"schemas": [
+		{	"//": "demo",
+			"name": "demo",
+			"tables": [
+				{	"//": "Demo_Table",	
+					"pgName": "Demo_Table",
+					"jsName": "DemoTable",
+					"createScript": true,
+					"readScript": true,
+					"updateScript": true,
+					"deleteScript": true,
+					"selectAllScript": true,
+					"primaryKeys": [
+						{	"//": "id",
+							"pgName": "id",
+							"jsName": "ID",
+							"type": "serial"
+						}
+					],
+					"foreignKeys":[
+						{	"//": "other_id",
+							"columns": [
+								{
+									"pgName": "other_id",
+									"jsName": "otherID",
+									"type": "integer"
+								}
+							],
+							"reference": {
+								"schema": "other",
+								"table": "Other_Table",
+								"columns": [
+									"id"
+								]
+							}
+						}
+					],
+					"uniqueKeys": [
+						{	"//": "uniqueName",
+							"columnsPgNames": [
+								"unique_name"
+							]
+						}
+					],
+					"columns": [
+						{   "//": "unique_name",
+							"pgName": "unique_name",
+							"jsName": "uniqueName",
+							"type": "text"
+						}
+					]
+				}
+			]
+		}
+	]
+}
