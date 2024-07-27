@@ -133,8 +133,10 @@ const generate = () => {
 		).join(',\n') + `\n` +
 		`}\n\n`
 	)
-	
-	for (const schema of model.schemas){
+	const schemas = model.schemas.sort((a, b) => 
+		a.pgName > b.pgName
+	)
+	for (const schema of schemas){
 		const schemaFldId = `fld_${fld_id++}`
 		const schemaName = schema.name
 		const tablesJsNames = schema.tables.map(t => t.jsName) // Need to fill root files before Main loop

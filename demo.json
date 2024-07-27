@@ -44,7 +44,7 @@
 						}
 					],
 					"columns": [
-						{   "//": "unique_name",
+						{	"//": "unique_name",
 							"pgName": "unique_name",
 							"jsName": "uniqueName",
 							"type": "text"
