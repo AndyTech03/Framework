@@ -3,8 +3,10 @@ const hostname = '127.0.0.1';
 const port = 3000;
 const fs = require('fs');
 const generate = require('./code');
+const generateSrc = require('./preprocessor');
 
 const server = createServer((req, res) => {
+	console.log(req.url);
 	res.statusCode = 200
 	switch (req.url) {
 		case '/':
@@ -12,6 +14,7 @@ const server = createServer((req, res) => {
 			res.end(fs.readFileSync('index.html'))
 			break
 		case '/test':
+			// res.end(generateSrc('testModel.json'))
 			res.end(generate())
 			break
 		default:

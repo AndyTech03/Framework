@@ -134,7 +134,9 @@ const generate = () => {
 		`}\n\n`
 	)
 	const schemas = model.schemas.sort((a, b) => 
-		a.pgName > b.pgName
+		a.pgName == b.pgName ? 1 : (
+			a.pgName < b.pgName ? 1 : -1
+		)
 	)
 	for (const schema of schemas){
 		const schemaFldId = `fld_${fld_id++}`

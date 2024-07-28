@@ -18,6 +18,7 @@ pids
 
 src/*
 /model.json
+/testModel.json
 blueprints/*/*
 
 
