@@ -48,6 +48,14 @@ const generateSrc = (fileName) => {
 			envFile.close()
 		}
 	}
+	{	// Importing plugins
+		for (const plugin of this.app.plugins) {
+			fs.copyFileSync(
+				`./plugins/${plugin.name}.js`,
+				`${this.pluginsPath}/${plugin.name}.js`
+			)
+		}
+	}
 	{	// Create and Fill appFile
 		const appFile = fs.createWriteStream(`${this.srcPath}/app.js`)
 		appFile.write(
