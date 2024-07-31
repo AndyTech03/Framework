@@ -14,8 +14,8 @@ const server = createServer((req, res) => {
 			res.end(fs.readFileSync('index.html'))
 			break
 		case '/test':
-			// res.end(generateSrc('testModel.json'))
-			res.end(generate())
+			res.end(generateSrc('testModel.json'))
+			// res.end(generate())
 			break
 		default:
 			res.statusCode = 404

@@ -1,0 +1,20 @@
+App                         '/'
+	serviceA                '/serviceA'
+		controllerA         '/serviceA/controllerA'
+			routeA          '/serviceA/controllerA/routeA'
+                            'Promise.resolve('
+				mapperA		').then((result) => modelA.map(...)'
+				handlerA    ').then((model) => handlerA(...)'
+				mapperB		').then((result) => modelB.map(...)'
+				handlerB    ').then((model) => handlerB(...)'
+				mapperC		').then((result) => modelC.map(...)'
+				handlerC    ').then((model) => handlerC(...)'
+				senderA		').then((result) => senderA(...)'
+				catcherA	').catch((error) => catcherA(...)'
+				finisherA	').finally(() => finisherA(...))'
+
+На каждый сервис 1 схема данных БД и наоборот
+На каждый контроллер 1 таблица данных (таблицы-перечисления не в счёт)
+На каждый маршрут минимум 1 мапер, обработчик, отправитель, ловец. (завершитель опционален)
+Перед каждым обработчиком вызывается хотя бы 1 мапер
+После каждого отправителя должен быть хотя бы 1 ловец
