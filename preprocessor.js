@@ -1,12 +1,5 @@
-const fs = require('fs')
-const { functionsTemplate, exportsTemplate } = require('./blueprints/jsTemplates/files')
 const { log } = require('console')
-const { deleteForeignKeys, foreignKey } = require('./blueprints/queries/foreignKeys')
-const { routerTemplate } = require('./blueprints/routers/routers')
-const { mainTestsTemplate, componentTestsTemplate } = require('./blueprints/tests/tests')
-const { tablesTemplate } = require('./blueprints/queries/tables')
-const queriesRouter = require('./blueprints/queries/queriesRouter')
-const routesRouter = require('./blueprints/routes/routesRouter')
+const fs = require('fs')
 
 
 const generateSrc = (fileName) => {
@@ -126,6 +119,160 @@ const generateSrc = (fileName) => {
 		this.routerFile = fs.createWriteStream(`${this.srcPath}/router.js`, {autoClose: true})
 		this.testsFile = fs.createWriteStream(`${this.srcPath}/app.test.js`, {autoClose: true})
 	}
+	for (let service of this.app.services) {
+		{	// Default values
+			service.pgName = service.name
+			service.camelCaseName = service.camelCaseName || camelCaseName(service.name)
+			service.PascalCaseName = service.PascalCaseName || PascalCaseName(service.name)
+			service.schema = {
+				pgName: service.schema,
+				camelCaseName: camelCaseName(service.schema),
+				PascalCaseName: PascalCaseName(service.schema),
+			}
+			service.templates = service.templates || []
+			service.tables = service.tables || []
+			service.controllers = service.controllers || []
+		}
+		{	// Create service dirs
+			service.rootPath = `${this.servicesPath}/${service.camelCaseName}`
+
+			mkDir(service.rootPath)
+		}
+		for (let table of service.tables) {
+			{	// Default values
+				table.pgName = table.name
+				table.schema = service.schema
+				table.camelCaseName = table.camelCaseName || camelCaseName(table.name)
+				table.PascalCaseName = table.PascalCaseName || PascalCaseName(table.name)
+				table.primaryKeys = table.primaryKeys || []
+				table.foreignKeys = table.foreignKeys || []
+				table.foreignArrayKeys = table.foreignArrayKeys || []
+				table.uniqueKeys = table.uniqueKeys || []
+				table.columns = table.columns || []
+
+				for (let column of table.columns) {
+					{	// Default values
+						column.pgName = column.name
+						column.camelCaseName = column.camelCaseName || camelCaseName(column.name)
+						column.PascalCaseName = column.PascalCaseName || PascalCaseName(column.name)
+						column.dataType = column.dataType || getColumnDataType(column)
+						column.flags = {
+							editable: (column.nonEditable || false) == false,
+							primaryKey: table.primaryKeys.includes(column.name),
+							foreignKey: table.foreignKeys.some((key) => key.columns.includes(column.name)),
+							foreignArrayKey: table.foreignArrayKeys.some((key) => key.arrayColumn == column.name),
+							uniqueKey: table.uniqueKeys.some((key) => key.includes(column.name)),
+							array: column.type.match('array|[]') != null,
+							serial: column.type.includes('serial'),
+							hasOnUpdate: column.onUpdate != undefined,
+							hasDefault: column.default != undefined,
+						}
+					}
+				}
+			}
+			{	// Filter columns
+				table.primaryKeysColumns = table.columns.filter(
+					column => column.flags.primaryKey
+				)
+			}
+		}
+		{	// Create and Fill tablesFile 
+			const tablesFile = fs.createWriteStream(`${service.rootPath}/table.pg.sql`)
+			tablesFile.write(
+				`drop schema if exists ${service.schema.pgName} cascade;\n` +
+				`create schema ${service.schema.pgName};\n` +
+				`\n\n` +
+				service.tables.map((table) =>
+					`create table ${service.schema.pgName}.${table.pgName} (` +
+					[
+						table.columns.map((column) => 
+						`\n	${column.pgName} ${column.type} not null` + (
+							column.flags.hasDefault ? (
+								`\n		default ${column.default}`
+							) : '')
+						).join(','),
+						[
+							`	primary key (` +
+							table.primaryKeys.join(', ') + `)`,
+						].concat(
+							table.uniqueKeys.map((key) =>
+								`	unique (${key.join(', ')})`
+						)).join(',\n')
+					].join(',\n\n') +
+					`\n);`
+				).join('\n\n')
+			)
+		}
+	}
+	{	// Create and Fill foreignKeysFile 
+		log(objectToPrettyText(this.app.services))
+		const foreignKeysFile = fs.createWriteStream(`${this.rootPath}/foreignKeys.pg.sql`)
+		foreignKeysFile.write(
+			[
+				`-- Delete All Foreign Keys\n` +
+				`do $$\n` +
+				`declare\n` +
+				`	r record;\n` +
+				`begin\n` +
+				`	for r in (\n` +
+				`		select table_schema, table_name, constraint_name\n` +
+				`		from information_schema.table_constraints\n` +
+				`		where constraint_type = 'FOREIGN KEY' or\n` +
+				`		(constraint_type = 'CHECK' and constraint_name like 'array_fkey%')\n` +
+				`	) loop\n` +
+				`		raise info '%', 'dropping ' || r.constraint_name;\n` +
+				`		execute concat(\n` +
+				`			'alter table ', r.table_schema, '.', r.table_name,\n` +
+				`			' drop constraint ', r.constraint_name\n` +
+				`		);\n` +
+				`	end loop;\n` +
+				`end;\n` +
+				`$$;`,
+				`-- Array Foreign Key Check Function\n` +
+				`create or replace function\n` +
+				`test.array_fkey_chech(\n` +
+				`	_array text,\n` +
+				`	_table text,\n` +
+				`	_column text\n` +
+				`)\n` +
+				`returns boolean\n` +
+				`language plpgsql as $$\n` +
+				`declare\n` +
+				`	_result boolean;\n` +
+				`begin\n` +
+				`	execute concat('select array_agg(', _column, ') @> ''', _array, ''' from ', _table) into _result;\n` +
+				`	return _result;\n` +
+				`end;\n` +
+				`$$;`,
+				...this.app.services.map((service) => 
+					`--	--	Service ${service.pgName}\n` +
+					service.tables.map((table) =>
+						`--	Table ${table.schema.pgName}.${table.pgName}\n` +
+						table.foreignKeys.map((key) =>
+							`alter table ${table.schema.pgName}.${table.pgName}\n`+
+							`add constraint fkey_${table.schema.pgName}_${table.pgName}__${
+								key.columns.join('__')
+							}\n` +
+							`foreign key (\n` +
+							`	${key.columns.join(', ')}\n` +
+							`) references ${key.reference.schema}.${key.reference.table} (\n` +
+							`	${key.reference.columns.join(', ')}\n` +
+							`);`
+						).concat(
+							table.foreignArrayKeys.map((arrayKey) =>
+								`alter table ${table.schema.pgName}.${table.pgName}\n`+
+								`add constraint array_fkey_${table.schema.pgName}_${table.pgName}__` +
+								`${arrayKey.arrayColumn} check (\n` +
+								`	test.array_fkey_chech(${arrayKey.arrayColumn}::text, ` +
+								`'${arrayKey.reference.schema}.${arrayKey.reference.table}', '${arrayKey.reference.column}')\n` +
+								`);`
+							)
+						).join('\n')
+					).join('\n\n')
+				)
+			].join('\n\n\n')
+		)
+	}
 	{	// Fill routerFile
 		this.routerFile.write(
 			`const router = (fastify, options, done) => {\n` +
@@ -135,7 +282,7 @@ const generateSrc = (fileName) => {
 			`module.exports = router`
 		)
 	}
-	{	// Fill routerFile
+	{	// Fill testsFile
 		this.testsFile.write(
 			`const test = require('tap').test\n` +
 			`\n\n` +
@@ -143,7 +290,7 @@ const generateSrc = (fileName) => {
 			`	test: true\n` +
 			`}\n` +
 			`\n\n` +
-			`test('test', { only: tests.test }, (t) => {})`
+			`test('test', { only: tests.test }, async (t) => {})`
 		)
 	}
 }
@@ -175,8 +322,14 @@ const camelCaseName = (name) => {
 	return result
 }
 
-const PascalCaseName = (camelCaseName) => {
-	return camelCaseName[0].toUpperCase() + camelCaseName.slice(1)
+const PascalCaseName = (name) => {
+	const matches = name.matchAll(/(^|_|)(.+?)(_|$)/gm)
+	let result = ''
+	for (const match of matches){
+		result += match[1]
+		result += match[2][0].toUpperCase() + match[2].slice(1).toLowerCase()
+	}
+	return result
 }
 
 const getColumnDataType = (column) => {
