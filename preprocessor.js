@@ -28,6 +28,21 @@ const generateSrc = (fileName) => {
 		mkDir(this.pluginsPath)
 		mkDir(this.servicesPath)
 	}
+	{	// Importing plugins
+		for (const plugin of this.app.plugins) {
+			fs.copyFileSync(
+				`./plugins/${plugin.name}.js`,
+				`${this.pluginsPath}/${plugin.name}.js`
+			)
+		}
+	}
+	{	// Importing utils
+		fs.cpSync(
+			`./utils`,
+			`${this.rootPath}/utils`,
+			{ recursive: true }
+		)
+	}
 	{	// Create and Fill environments files
 		for (const environment of this.app.environments) {
 			const envFile = fs.createWriteStream(`${this.rootPath}/.env.${environment.name}`)
@@ -39,14 +54,6 @@ const generateSrc = (fileName) => {
 				)
 			)
 			envFile.close()
-		}
-	}
-	{	// Importing plugins
-		for (const plugin of this.app.plugins) {
-			fs.copyFileSync(
-				`./plugins/${plugin.name}.js`,
-				`${this.pluginsPath}/${plugin.name}.js`
-			)
 		}
 	}
 	{	// Create and Fill appFile
@@ -115,39 +122,39 @@ const generateSrc = (fileName) => {
 		)
 		serverFile.close()
 	}
-	{	// Create root files
-		this.routerFile = fs.createWriteStream(`${this.srcPath}/router.js`, {autoClose: true})
-		this.testsFile = fs.createWriteStream(`${this.srcPath}/app.test.js`, {autoClose: true})
-	}
 	for (let service of this.app.services) {
 		{	// Default values
-			service.pgName = service.name
-			service.camelCaseName = service.camelCaseName || camelCaseName(service.name)
-			service.PascalCaseName = service.PascalCaseName || PascalCaseName(service.name)
 			service.schema = {
 				pgName: service.schema,
 				camelCaseName: camelCaseName(service.schema),
 				PascalCaseName: PascalCaseName(service.schema),
 			}
+			service.pgName = service.name
+			service.camelCaseName = service.camelCaseName || camelCaseName(service.name)
+			service.PascalCaseName = service.PascalCaseName || PascalCaseName(service.name)
+			
 			service.templates = service.templates || []
 			service.tables = service.tables || []
-			service.controllers = service.controllers || []
+			service.tableAdapters = service.tableAdapters || []
 		}
 		{	// Create service dirs
 			service.rootPath = `${this.servicesPath}/${service.camelCaseName}`
-
+	
 			mkDir(service.rootPath)
 		}
 		for (let table of service.tables) {
 			{	// Default values
-				table.pgName = table.name
 				table.schema = service.schema
+
+				table.pgName = table.name
 				table.camelCaseName = table.camelCaseName || camelCaseName(table.name)
 				table.PascalCaseName = table.PascalCaseName || PascalCaseName(table.name)
+				
 				table.primaryKeys = table.primaryKeys || []
 				table.foreignKeys = table.foreignKeys || []
 				table.foreignArrayKeys = table.foreignArrayKeys || []
 				table.uniqueKeys = table.uniqueKeys || []
+				
 				table.columns = table.columns || []
 
 				for (let column of table.columns) {
@@ -176,8 +183,50 @@ const generateSrc = (fileName) => {
 				)
 			}
 		}
+		for (let adapter of service.adapters) {
+			{	// Default values
+				adapter.schema = service.schema
+				
+				adapter.pgName = adapter.name
+				adapter.camelCaseName = adapter.camelCaseName || camelCaseName(adapter.name)
+				adapter.PascalCaseName = adapter.PascalCaseName || PascalCaseName(adapter.name)
+			}
+			{	// Create adapter dir
+				adapter.rootPath = `${service.rootPath}/${adapter.camelCaseName}`
+		
+				mkDir(adapter.rootPath)
+			}
+			{	// Create and Fill queriesFile
+				const queriesFile = fs.createWriteStream(`${adapter.rootPath}/queries.js`)
+				queriesFile.write(
+					``
+				)
+				queriesFile.close()
+			}
+			{	// Create and Fill adapterFile
+				const adapterFile = fs.createWriteStream(`${adapter.rootPath}/adapter.js`)
+				adapterFile.write(
+					`const adapter = (fastify, options, done) => {\n` +
+					`	done()\n` +
+					`}\n` +
+					`\n\n` +
+					`module.exports = adapter`
+				)
+				adapterFile.close()
+			}
+			{	// Create and Fill testsFile
+				const testsFile = fs.createWriteStream(`${adapter.rootPath}/tests.test.js`)
+				testsFile.write(
+					`const tests = (parentTest) => {\n` +
+					`}\n` +
+					`\n\n` +
+					`module.exports = tests`
+				)
+				testsFile.close()
+			}
+		}
 		{	// Create and Fill tablesFile 
-			const tablesFile = fs.createWriteStream(`${service.rootPath}/table.pg.sql`)
+			const tablesFile = fs.createWriteStream(`${service.rootPath}/tables.pg.sql`)
 			tablesFile.write(
 				`drop schema if exists ${service.schema.pgName} cascade;\n` +
 				`create schema ${service.schema.pgName};\n` +
@@ -202,10 +251,46 @@ const generateSrc = (fileName) => {
 					`\n);`
 				).join('\n\n')
 			)
+			tablesFile.close()
+		}
+		{	// Create and Fill routerFile 
+			const routerFile = fs.createWriteStream(`${service.rootPath}/router.js`)
+			routerFile.write(
+				service.adapters.map((adapter) => 
+					`const ${adapter.camelCaseName}Adapter = require('./${adapter.camelCaseName}/adapter')`
+				).join('\n') + `\n` +
+				`\n\n` +
+				`const router = (fastify, options, done) => {\n` +
+				service.adapters.map((adapter) => 
+					`	fastify.register(${adapter.camelCaseName}Adapter, { prefix: '${adapter.camelCaseName}' })`
+				).join('\n') + `\n` +
+				`\n` +
+				`	done()\n` +
+				`}\n` +
+				`\n\n` +
+				`module.exports = router`
+			)
+			routerFile.close()
+		}
+		{	// Create and Fill testsFile 
+			const testsFile = fs.createWriteStream(`${service.rootPath}/tests.test.js`)
+			testsFile.write(
+				service.adapters.map((adapter) => 
+					`const ${adapter.camelCaseName}Tests = require('./${adapter.camelCaseName}/tests.test')`
+				).join('\n') + `\n` +
+				`\n\n` +
+				`const tests = (parentTest) => {\n` +
+				service.adapters.map((adapter) => 
+					`	${adapter.camelCaseName}Tests(parentTest)\n`
+				).join('\n') + `\n` +
+				`}\n` +
+				`\n\n` +
+				`module.exports = tests`
+			)
+			testsFile.close()
 		}
 	}
 	{	// Create and Fill foreignKeysFile 
-		log(objectToPrettyText(this.app.services))
 		const foreignKeysFile = fs.createWriteStream(`${this.rootPath}/foreignKeys.pg.sql`)
 		foreignKeysFile.write(
 			[
@@ -226,22 +311,6 @@ const generateSrc = (fileName) => {
 				`			' drop constraint ', r.constraint_name\n` +
 				`		);\n` +
 				`	end loop;\n` +
-				`end;\n` +
-				`$$;`,
-				`-- Array Foreign Key Check Function\n` +
-				`create or replace function\n` +
-				`test.array_fkey_chech(\n` +
-				`	_array text,\n` +
-				`	_table text,\n` +
-				`	_column text\n` +
-				`)\n` +
-				`returns boolean\n` +
-				`language plpgsql as $$\n` +
-				`declare\n` +
-				`	_result boolean;\n` +
-				`begin\n` +
-				`	execute concat('select array_agg(', _column, ') @> ''', _array, ''' from ', _table) into _result;\n` +
-				`	return _result;\n` +
 				`end;\n` +
 				`$$;`,
 				...this.app.services.map((service) => 
@@ -272,26 +341,49 @@ const generateSrc = (fileName) => {
 				)
 			].join('\n\n\n')
 		)
+		foreignKeysFile.close()
 	}
-	{	// Fill routerFile
-		this.routerFile.write(
+	{	// Create and Fill routerFile
+		const routerFile = fs.createWriteStream(`${this.srcPath}/router.js`) 
+		routerFile.write(
+			this.app.services.map((service) => 
+				`const ${service.camelCaseName}Router = require('./services/${service.camelCaseName}/router')`
+			).join(`\n`) + `\n` +
+			`\n\n` +
 			`const router = (fastify, options, done) => {\n` +
+			this.app.services.map((service) => 
+				`	fastify.register(${service.camelCaseName}Router, { prefix: '${service.camelCaseName}' })`
+				).join(`\n`) + `\n` +
+			`\n` +
 			`	done()\n` +
 			`}\n` +
 			`\n\n` +
 			`module.exports = router`
 		)
+		routerFile.close()
 	}
-	{	// Fill testsFile
-		this.testsFile.write(
+	{	// Create and Fill testsFile
+		const testsFile = fs.createWriteStream(`${this.srcPath}/app.test.js`)
+		testsFile.write(
 			`const test = require('tap').test\n` +
+			`\n` +
+			this.app.services.map((service) => 
+				`const ${service.camelCaseName}Tests = require('./services/${service.camelCaseName}/tests.test')`
+			).join(`\n`) + `\n` +
 			`\n\n` +
 			`const tests = {\n` +
-			`	test: true\n` +
+			this.app.services.map((service) => 
+				`	${service.camelCaseName}: true`
+			).join(`,\n`) + `\n` +
 			`}\n` +
 			`\n\n` +
-			`test('test', { only: tests.test }, async (t) => {})`
+			this.app.services.map((service) => 
+				`test('${service.camelCaseName}', { only: tests.${service.camelCaseName} }, async (t) =>\n` +
+				`	${service.camelCaseName}Tests(t)\n` +
+				`)`
+			).join(`\n`)
 		)
+		testsFile.close()
 	}
 }
 
