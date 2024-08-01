@@ -195,6 +195,20 @@ const generateSrc = (fileName) => {
 	
 			mkDir(adapter.rootPath)
 			//#endregion
+			for (let route of adapter.routes) {
+				// #region Default values
+				route.schema = service.schema
+				
+				route.pgName = route.name
+				route.camelCaseName = route.camelCaseName || camelCaseName(route.name)
+				route.PascalCaseName = route.PascalCaseName || PascalCaseName(route.name)
+
+				route.request = {
+					path: route.request.path || `/${route.camelCaseName}`,
+					method: route.request.method || 'get',
+				}
+				//#endregion
+			}
 			// #region Create and Fill queriesFile
 			const queriesFile = fs.createWriteStream(`${adapter.rootPath}/queries.js`)
 			queriesFile.write(
@@ -206,6 +220,38 @@ const generateSrc = (fileName) => {
 			const adapterFile = fs.createWriteStream(`${adapter.rootPath}/adapter.js`)
 			adapterFile.write(
 				`const adapter = (fastify, options, done) => {\n` +
+				adapter.routes.map((route) =>
+					`	fastify.${route.request.method}('${route.request.path}', async (request, reply) => {\n` +
+					`		Promise.resolve(\n` +
+					route.handlers.map((handler) =>
+						`		).then(() => \n` +
+						`			Promise.resolve(\n` +
+						`			).then(() => {\n` +
+						`				const maper = '${handler.maper}'\n` +
+						`				return ({})\n` +
+						`			}).then((model) => {\n` +
+						`				const worker = '${handler.worker}'\n` +
+						`				return ({})\n` +
+						`			}).then((result) => {\n` +
+						`				const validator = '${handler.validator}'\n` +
+						`			})`
+					).join('\n') + '\n' +
+					`		).then(() => {\n` +
+					`			const sender = '${route.sender}'\n` +
+					`			reply.send('OK')\n` +
+					`		}` +
+					route.catchers.map((catcher) =>
+								`).catch((error) => {\n` +
+						`			const catcher = '${catcher}'\n` +
+						`		}`
+					).join('') +
+							`).finally(() => {\n` +
+					`			const finisher = '${route.finisher}'\n` +
+					`		})\n` +
+					`		return reply\n` +
+					`	})`
+				).join(`\n\n`) + `\n` +
+				`\n` +
 				`	done()\n` +
 				`}\n` +
 				`\n\n` +

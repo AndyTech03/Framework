@@ -1,17 +1,19 @@
-App                         '/'
-	serviceA                '/serviceA'
-		controllerA         '/serviceA/controllerA'
-			routeA          '/serviceA/controllerA/routeA'
-                            'Promise.resolve('
-				mapperA		').then((result) => modelA.map(...)'
-				handlerA    ').then((model) => handlerA(...)'
-				mapperB		').then((result) => modelB.map(...)'
-				handlerB    ').then((model) => handlerB(...)'
-				mapperC		').then((result) => modelC.map(...)'
-				handlerC    ').then((model) => handlerC(...)'
-				senderA		').then((result) => senderA(...)'
-				catcherA	').catch((error) => catcherA(...)'
-				finisherA	').finally(() => finisherA(...))'
+App								/
+	serviceRouter				/service
+		serviceAdapter			/service/adapter
+			adapterRoute		/service/adapter/route
+			
+								Promice.resolve(
+				handler			).then(() => 
+									Promice.resolve(
+					maper			).then(() => { mapper }
+					worker			).then((model) => { worker }
+					validator		).then((result) => { validatior }
+									)
+				sender			).then(() => { sender }
+				catcher			).catch((error) => { catcher }
+				finisher		).finally(() => { finisher }
+								)
 
 На каждый сервис 1 схема данных БД и наоборот
 На каждый контроллер 1 таблица данных (таблицы-перечисления не в счёт)
