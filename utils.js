@@ -1,4 +1,45 @@
-const getSerialType_orDefault = (type) => {
+const fs = require('fs')
+
+
+const mkDir = (dirName) => {
+	if (!fs.existsSync(dirName)) {
+		fs.mkdirSync(dirName, { recursive: true })
+ 	}
+}
+
+const pgRow_to_jsObject = (pgRow, jsKeys) => {
+	const entries = Object.keys(pgRow).map(
+		key => ({[jsKeys[key]]: pgRow[key]})
+	)
+	return Object.assign({}, ...entries)
+}
+
+const camelCaseName = (name) => {
+	const matches = name.matchAll(/(^|_|)(.+?)(_|$)/gm)
+	let result = ''
+	for (const match of matches){
+		result += match[1]
+		if (match.index == 0) {
+			result += match[2].toLowerCase()
+			continue
+		}
+		result += match[2][0].toUpperCase() + match[2].slice(1).toLowerCase()
+	}
+	return result
+}
+
+const PascalCaseName = (name) => {
+	const matches = name.matchAll(/(^|_|)(.+?)(_|$)/gm)
+	let result = ''
+	for (const match of matches){
+		result += match[1]
+		result += match[2][0].toUpperCase() + match[2].slice(1).toLowerCase()
+	}
+	return result
+}
+
+const getColumnDataType = (column) => {
+	const type = column.type
 	if (type.includes('serial') == false)
 		return type
 	switch (type) {
@@ -13,49 +54,63 @@ const getSerialType_orDefault = (type) => {
 	}
 }
 
-const getDateTimeString = (date = undefined) => {
-	if (date === undefined)
-		date = new Date()
-	return date.toISOString().split('.')[0] + 'Z'
-}
+const objectToPrettyText = (obj, indent=0) => {
+	const nextIndent = indent + 1
 
-const getColumnMockValue = (column) => {
-	const type = getSerialType_orDefault(column.type)
-	switch (type) {
-		case 'bigint':
-		case 'integer':
-		case 'smallint':
-			return 1
-		case 'text':
-			return 'SomeText'
-		case 'json':
-			return '{"data": "text"}'
-		case 'timestamp without time zone':
-			return getDateTimeString()
-		default:
-			return type
+	if (obj == null)
+		return 'null'
+
+	if (obj == undefined)
+		return 'undefined'
+
+	if (typeof obj == 'string')
+			return `'${obj}'`
+
+	if (typeof obj == 'number') {
+		const numbers = obj.toString().split('').reverse()
+		let temp = []
+		for (let i = 0; i < numbers.length; i++) {
+			if (i != 0 && i % 3 == 0)
+				temp.push('_')
+			temp.push(numbers[i])
+		}
+		return temp.reverse().join('')
 	}
-}
 
-const columns_toJson = (columns) => JSON.stringify(
-    columns.reduce((result, column, i) => 
-        ({...result, [column.jsName]: getColumnMockValue(column)}), {}
-    ), 
-    null, '\t'
-)
+	if (Array.isArray(obj)) {
+		if (obj.length == 0)
+			return '[]'
 
-const pgRow_to_jsObject = (pgRow, jsKeys) => {
-    const entries = Object.keys(pgRow).map(
-        key => ({[jsKeys[key]]: pgRow[key]})
-    )
-    return Object.assign({}, ...entries)
+		return (
+			`[\n` +
+			obj.map(
+				item => `${'\t'.repeat(nextIndent)}${objectToPrettyText(item, nextIndent)}`
+			).join(',\n') + '\n' +
+			`${'\t'.repeat(indent)}]`
+		)
+	}
+		
+	if (typeof obj != 'object')
+		return obj.toString()
+
+	const keys = Object.keys(obj)
+	if (keys.length == 0)
+		return '{}'
+
+	return (
+		`{\n` +
+		keys.map((key) => 
+			`${'\t'.repeat(nextIndent)}${key}: ${objectToPrettyText(obj[key], nextIndent)}`
+		).join(',\n') + '\n' +
+		('\t'.repeat(indent)) + `}`
+	)
 }
 
 module.exports = {
-    getSerialType_orDefault,
-    getColumnMockValue,
-    getDateTimeString,
-    getColumnMockValue,
-    columns_toJson,
-    pgRow_to_jsObject
+   mkDir,
+   pgRow_to_jsObject,
+   camelCaseName,
+   PascalCaseName,
+   getColumnDataType,
+   objectToPrettyText,
 }
