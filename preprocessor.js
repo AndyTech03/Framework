@@ -9,7 +9,10 @@ const {
 	getColumnDataType,
 	objectToPrettyText,
 } = require('./utils')
-const selectMapper = require('./blueprints/handlers/mappers/index')
+const {
+	generateHandler,
+	operateHandlerRefs
+} = require('./blueprints/handlers')
 
 
 const generateSrc = (fileName) => {
@@ -233,18 +236,10 @@ const generateSrc = (fileName) => {
 				adapter.routes.map((route) =>
 					`	fastify.${route.request.method}('${route.request.path}', async (request, reply) => {\n` +
 					`		Promise.resolve(\n` +
-					route.handlers.map((handler) =>
-						`		).then(() => \n` +
-						`			Promise.resolve(\n` +
-						`			).then(() => {\n` +
-						selectMapper(handler.maper, 4) +
-						`			}).then((model) => {\n` +
-						`				console.log(model)\n` +
-						`				const worker = '${handler.worker}'\n` +
-						`				return ({})\n` +
-						`			}).then((result) => {\n` +
-						`				const validator = '${handler.validator}'\n` +
-						`			})`
+					route.handlers.map((handler) => {
+						operateHandlerRefs(handler, this.app.services, service, adapter, route)
+						return generateHandler(handler, 2)
+					}
 					).join('\n') + '\n' +
 					`		).then(() => {\n` +
 					`			const sender = '${route.sender}'\n` +
