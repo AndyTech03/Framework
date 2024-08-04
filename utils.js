@@ -1,3 +1,4 @@
+const { log } = require('console')
 const fs = require('fs')
 
 
@@ -54,9 +55,7 @@ const getColumnDataType = (column) => {
 	}
 }
 
-const objectToPrettyText = (obj, indent=0) => {
-	const nextIndent = indent + 1
-
+const getStrOrFalse = (obj) => {
 	if (obj == null)
 		return 'null'
 
@@ -64,7 +63,7 @@ const objectToPrettyText = (obj, indent=0) => {
 		return 'undefined'
 
 	if (typeof obj == 'string')
-			return `'${obj}'`
+		return `"${obj}"`
 
 	if (typeof obj == 'number') {
 		const numbers = obj.toString().split('').reverse()
@@ -77,21 +76,68 @@ const objectToPrettyText = (obj, indent=0) => {
 		return temp.reverse().join('')
 	}
 
+	if (typeof obj != 'object')
+		return obj.toString()
+
+	return false
+}
+
+const objectToPrettyText = (obj, indent=0) => {
+	const simpleResult = getStrOrFalse(obj)
+	if (simpleResult)
+		return simpleResult
+
+	const result = {}
+	const visited = [obj]
+	const queue = [{node: obj, parentNode: result}]
+	
+	while (queue.length > 0) {
+		const {node, parentNode} = queue.shift()
+		for (const key in node) {
+			const item = node[key]
+			const simpleResult = getStrOrFalse(item)
+			if (simpleResult) {
+				parentNode[key] = simpleResult
+				continue
+			}
+			if (node.hasOwnProperty(key) && visited.includes(item)) {
+				parentNode[key] = `"<Recursive loop>"`
+				continue
+			}
+			visited.push(item)
+			if (Array.isArray(item))
+				parentNode[key] = []
+			else
+				parentNode[key] = {}
+			queue.push({
+				node: item, 
+				parentNode: parentNode[key]
+			})
+		}
+	}
+	return clearObjectToString(result, indent)
+}
+
+const clearObjectToString = (obj, indent=0) => {
+	const nextIndent = indent + 1
+	const indentText = '    '.repeat(indent)
+	const nextIndentText = '    '.repeat(nextIndent)
+
+	if (typeof obj == 'string')
+		return obj
+
 	if (Array.isArray(obj)) {
 		if (obj.length == 0)
 			return '[]'
 
 		return (
 			`[\n` +
-			obj.map(
-				item => `${'\t'.repeat(nextIndent)}${objectToPrettyText(item, nextIndent)}`
+			obj.map(item => 
+				`${nextIndentText}${clearObjectToString(item, nextIndent)}`
 			).join(',\n') + '\n' +
-			`${'\t'.repeat(indent)}]`
+			`${indentText}]`
 		)
 	}
-		
-	if (typeof obj != 'object')
-		return obj.toString()
 
 	const keys = Object.keys(obj)
 	if (keys.length == 0)
@@ -100,11 +146,12 @@ const objectToPrettyText = (obj, indent=0) => {
 	return (
 		`{\n` +
 		keys.map((key) => 
-			`${'\t'.repeat(nextIndent)}${key}: ${objectToPrettyText(obj[key], nextIndent)}`
+			`${nextIndentText}${key}: ${clearObjectToString(obj[key], nextIndent)}`
 		).join(',\n') + '\n' +
-		('\t'.repeat(indent)) + `}`
+		`${indentText}}`
 	)
 }
+
 
 module.exports = {
    mkDir,

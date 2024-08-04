@@ -13,28 +13,232 @@ const {
 	generateHandler,
 	operateHandlerRefs
 } = require('./blueprints/handlers')
+const selectSender = require('./blueprints/senders')
+const selectCatcher = require('./blueprints/catchers')
+const selectFinisher = require('./blueprints/finishers')
 
 
 const generateSrc = (fileName) => {
 	const model = JSON.parse(fs.readFileSync(fileName).toString())
-	// #region Default values
-	this.app = model.app || {}
-	this.app = {
-		name: this.app.name || 'Generated App Name',
-		defaultOptions: this.app.defaultOptions || null,
-		environments: this.app.environments || [],
-		imports: this.app.imports || [],
-		plugins: this.app.plugins || [],
-		services: this.app.services || [],
-	}
-	// #endregion
-	// #region Create root dirs
+	//#region Default values
 	this.rootPath = './result'
 	this.srcPath = `${this.rootPath}/src`
 	this.docPath = `${this.srcPath}/doc`
 	this.pluginsPath = `${this.srcPath}/plugins`
 	this.servicesPath = `${this.srcPath}/services`
+	this.app = {
+		name: model.app.name || 'Generated App Name',
+		defaultOptions: undefined,
+		environments: [],
+		imports: [],
+		plugins: [],
+		services: [],
+		...model.app
+	}
+	// #endregion
+	//#region Compile Services
+	this.app.services = this.app.services.map((service) => {
+		const serviceId = service.id
+		const pgSchemaId = service.pgSchema.id
+		let templates = service.templates || []
+		let tables = service.tables || []
+		let adapters = service.adapters || []
+		//#region Copmile Templates
+		templates = templates.map((template) => {
+			return {
+				service: null,
+				...template,
+			}
+		})
+		//#endregion
+		//#region Copmile Tables
+		tables = tables.map((table) => {
+			const tableId = table.id
+			const primaryKeysIds = table.primaryKeysIds || []
+			const foreignKeys = table.foreignKeys || []
+			const foreignArrayKeys = table.foreignArrayKeys || []
+			const uniqueKeys = table.uniqueKeys || []
+			let columns = table.columns || []
+			let primaryKeysColumns;
+			//#region Compile Columns
+			columns = columns.map((column) => {
+				const columnId = column.id
 
+				return {
+					table: null,
+					id: columnId,
+					camelCaseName: camelCaseName(columnId),
+					PascalCaseName: PascalCaseName(columnId),
+					dataType: getColumnDataType(column),
+					default: undefined,
+					onUpdate: undefined,
+					nonEditable: undefined,
+					...column,
+					flags: {
+						primaryKey: primaryKeysIds.includes(columnId),
+						foreignKey: foreignKeys.some((key) => 
+							key.columnsIds.includes(columnId)
+						),
+						foreignArrayKey: foreignArrayKeys.some((key) => 
+							key.arrayColumnId = columnId
+						),
+						uniqueKey: uniqueKeys.some((key) => 
+							key.includes.columnId
+						),
+						editable: column.nonEditable != true,
+						array: column.type.match(/( array|\[\])$/) != null,
+						serial: column.type.endsWith('serial'),
+						hasDefault: column.default != undefined,
+					}
+				}
+			})
+			//#endregion
+			//#region Filter primaryKeysColumns
+			primaryKeysColumns = columns.filter((column) => 
+				column.flags.primaryKey
+			)
+			//#endregion
+			return {
+				service: null,
+				camelCaseName: camelCaseName(tableId),
+				PascalCaseName: PascalCaseName(tableId),
+				...table,
+				primaryKeysIds: primaryKeysIds,
+				foreignKeys: foreignKeys,
+				foreignArrayKeys: foreignArrayKeys,
+				uniqueKeys: uniqueKeys,
+				columns: columns,
+			}
+		})
+		//#endregion
+		//#region Copmile Adapters
+		adapters = adapters.map((adapter) => {
+			const adapterId = adapter.id
+			let routes = adapter.routes || []
+			//#region Compile Routes
+			routes = routes.map((route) => {
+				const routeId = route.id
+				let handlers = route.handlers || []
+				let catchers = route.catchers || []
+				//#region Compile Handlers
+				handlers = handlers.map((handler) => {
+					const handlerId = handler.id
+
+					return {
+						route: null,
+						rootPath: null,
+						camelCaseName: camelCaseName(handlerId),
+						PascalCaseName: PascalCaseName(handlerId),
+						...handler,
+						maper: {
+							handler: null,
+							...handler.maper
+						},
+						worker: {
+							handler: null,
+							...handler.worker
+						},
+						validator: {
+							handler: null,
+							...handler.validator
+						}
+					}
+				})
+				//#endregion
+				//#region Compile Catchers
+				catchers = catchers.map((catcher) => {
+					const catcherId = catcher.id
+
+					return {
+						route: null,
+						camelCaseName: camelCaseName(catcherId),
+						PascalCaseName: PascalCaseName(catcherId),
+						...catcher,
+					}
+				})
+				//#endregion 
+
+				return {
+					adapter: null,
+					camelCaseName: camelCaseName(routeId),
+					PascalCaseName: PascalCaseName(routeId),
+					...route,
+					handlers: handlers,
+					sender: {
+						route: null,
+						...route.sender
+					},
+					catchers: catchers,
+					finisher: {
+						route: null,
+						...route.sender
+					},
+				}
+			})
+			//#endregion
+			
+			return {
+				service: null,
+				camelCaseName: camelCaseName(adapterId),
+				PascalCaseName: PascalCaseName(adapterId),
+				...adapter,
+				routes,
+			}
+		})
+		//#endregion
+
+		return {
+			app: null,
+			rootPath: null,
+			camelCaseName: camelCaseName(serviceId),
+			PascalCaseName: PascalCaseName(serviceId),
+			...service,
+			pgSchema: {
+				id: pgSchemaId,
+				camelCaseName: camelCaseName(pgSchemaId),
+				PascalCaseName: PascalCaseName(pgSchemaId),
+				...service.pgSchema,
+			},
+			templates: templates,
+			tables: tables,
+			adapters: adapters,
+		}
+	})
+	this.app.services.map((service) => {
+		service.app = this.app
+		service.rootPath = service.rootPath || `${this.servicesPath}/${service.camelCaseName}`
+		service.templates.map((template) => {
+			template.service = service
+		})
+		service.tables.map((table) => {
+			table.service = service
+			table.columns.map((column) => {
+				column.table = table
+			})
+		})
+		service.adapters.map((adapter) => {
+			adapter.service = service
+			adapter.rootPath = adapter.rootPath || `${service.rootPath}/${adapter.camelCaseName}`
+			adapter.routes.map((route) => {
+				route.adapter = adapter
+				route.sender.route = route
+				route.finisher.route = route
+				route.handlers.map((handler) => {
+					handler.route = route
+					handler.maper.handler = handler
+					handler.worker.handler = handler
+					handler.validator.handler = handler
+				})
+				route.catchers.map((catcher) => {
+					catcher.route = route
+				})
+					
+			})
+		})
+	})
+	//#endregion
+	// log(objectToPrettyText(this.app))
+	// #region Create root dirs
 	if (fs.existsSync(this.rootPath))
 		fs.rmSync(this.rootPath, { recursive: true })
 	mkDir(this.docPath)
@@ -52,7 +256,7 @@ const generateSrc = (fileName) => {
 	// #region Importing utils
 	fs.cpSync(
 		`./utils`,
-		`${this.rootPath}/utils`,
+		`${this.srcPath}/utils`,
 		{ recursive: true }
 	)
 	//#endregion
@@ -87,9 +291,6 @@ const generateSrc = (fileName) => {
 		`	const app = Fastify(options || ` +
 		objectToPrettyText(this.app.defaultOptions, 1) + `)\n` +
 		`\n` +
-		`	// Router\n` +
-		`	app.register(router)\n` +
-		`\n` +
 		`	// Imports\n` +
 		this.app.imports.concat(
 			this.app.plugins
@@ -104,6 +305,9 @@ const generateSrc = (fileName) => {
 				`)`
 			)
 		).join('\n') + `\n` +
+		`\n` +
+		`	// Router\n` +
+		`	app.register(router)\n` +
 		`	return app\n` +
 		`}\n` +
 		`\n\n` +
@@ -136,92 +340,13 @@ const generateSrc = (fileName) => {
 	serverFile.close()
 	//#endregion
 	for (let service of this.app.services) {
-		// #region Default values
-		service.schema = {
-			pgName: service.schema,
-			camelCaseName: camelCaseName(service.schema),
-			PascalCaseName: PascalCaseName(service.schema),
-		}
-		service.pgName = service.name
-		service.camelCaseName = service.camelCaseName || camelCaseName(service.name)
-		service.PascalCaseName = service.PascalCaseName || PascalCaseName(service.name)
-		
-		service.templates = service.templates || []
-		service.tables = service.tables || []
-		service.tableAdapters = service.tableAdapters || []
-		//#endregion
 		// #region Create service dirs
-		service.rootPath = `${this.servicesPath}/${service.camelCaseName}`
-
 		mkDir(service.rootPath)
 		//#endregion
-		for (let table of service.tables) {
-			// #region Default values
-			table.schema = service.schema
-
-			table.pgName = table.name
-			table.camelCaseName = table.camelCaseName || camelCaseName(table.name)
-			table.PascalCaseName = table.PascalCaseName || PascalCaseName(table.name)
-			
-			table.primaryKeys = table.primaryKeys || []
-			table.foreignKeys = table.foreignKeys || []
-			table.foreignArrayKeys = table.foreignArrayKeys || []
-			table.uniqueKeys = table.uniqueKeys || []
-			
-			table.columns = table.columns || []
-			//#endregion
-			for (let column of table.columns) {
-				// #region Default values
-				column.pgName = column.name
-				column.camelCaseName = column.camelCaseName || camelCaseName(column.name)
-				column.PascalCaseName = column.PascalCaseName || PascalCaseName(column.name)
-				column.dataType = column.dataType || getColumnDataType(column)
-				column.flags = {
-					editable: (column.nonEditable || false) == false,
-					primaryKey: table.primaryKeys.includes(column.name),
-					foreignKey: table.foreignKeys.some((key) => key.columns.includes(column.name)),
-					foreignArrayKey: table.foreignArrayKeys.some((key) => key.arrayColumn == column.name),
-					uniqueKey: table.uniqueKeys.some((key) => key.includes(column.name)),
-					array: column.type.match('array|[]') != null,
-					serial: column.type.includes('serial'),
-					hasOnUpdate: column.onUpdate != undefined,
-					hasDefault: column.default != undefined,
-				}
-				//#endregion
-			}
-			// #region Filter columns
-			table.primaryKeysColumns = table.columns.filter(
-				column => column.flags.primaryKey
-			)
-			//#endregion
-		}
 		for (let adapter of service.adapters) {
-			// #region Default values
-			adapter.schema = service.schema
-			
-			adapter.pgName = adapter.name
-			adapter.camelCaseName = adapter.camelCaseName || camelCaseName(adapter.name)
-			adapter.PascalCaseName = adapter.PascalCaseName || PascalCaseName(adapter.name)
-			//#endregion
 			// #region Create adapter dir
-			adapter.rootPath = `${service.rootPath}/${adapter.camelCaseName}`
-	
 			mkDir(adapter.rootPath)
 			//#endregion
-			for (let route of adapter.routes) {
-				// #region Default values
-				route.schema = service.schema
-				
-				route.pgName = route.name
-				route.camelCaseName = route.camelCaseName || camelCaseName(route.name)
-				route.PascalCaseName = route.PascalCaseName || PascalCaseName(route.name)
-
-				route.request = {
-					path: route.request.path || `/${route.camelCaseName}`,
-					method: route.request.method || 'get',
-				}
-				//#endregion
-			}
 			// #region Create and Fill queriesFile
 			const queriesFile = fs.createWriteStream(`${adapter.rootPath}/queries.js`)
 			queriesFile.write(
@@ -232,26 +357,28 @@ const generateSrc = (fileName) => {
 			// #region Create and Fill adapterFile
 			const adapterFile = fs.createWriteStream(`${adapter.rootPath}/adapter.js`)
 			adapterFile.write(
+				`const { errorsHandler } = require("../../../utils/js/errorHandler")\n` +
+				`\n\n` +
 				`const adapter = (fastify, options, done) => {\n` +
+				`	const client = fastify.postgresql.client\n` +
 				adapter.routes.map((route) =>
-					`	fastify.${route.request.method}('${route.request.path}', async (request, reply) => {\n` +
+					`	fastify.${route.requestJsonSchema.method}('${route.requestJsonSchema.path}', async (request, reply) => {\n` +
+					`		this.results = []\n` +
 					`		Promise.resolve(\n` +
 					route.handlers.map((handler) => {
-						operateHandlerRefs(handler, this.app.services, service, adapter, route)
+						operateHandlerRefs(handler)
 						return generateHandler(handler, 2)
-					}
-					).join('\n') + '\n' +
+					}).join('\n') + '\n' +
 					`		).then(() => {\n` +
-					`			const sender = '${route.sender}'\n` +
-					`			reply.send('OK')\n` +
+					selectSender(route.sender, 2) +
 					`		}` +
 					route.catchers.map((catcher) =>
 								`).catch((error) => {\n` +
-						`			const catcher = '${catcher}'\n` +
+						selectCatcher(catcher, 2) +
 						`		}`
 					).join('') +
 							`).finally(() => {\n` +
-					`			const finisher = '${route.finisher}'\n` +
+					selectFinisher(route.finisher, 2) +
 					`		})\n` +
 					`		return reply\n` +
 					`	})`
@@ -278,21 +405,21 @@ const generateSrc = (fileName) => {
 		// #region Create and Fill tablesFile 
 		const tablesFile = fs.createWriteStream(`${service.rootPath}/tables.pg.sql`)
 		tablesFile.write(
-			`drop schema if exists ${service.schema.pgName} cascade;\n` +
-			`create schema ${service.schema.pgName};\n` +
+			`drop schema if exists ${service.pgSchema.id} cascade;\n` +
+			`create schema ${service.pgSchema.id};\n` +
 			`\n\n` +
 			service.tables.map((table) =>
-				`create table ${service.schema.pgName}.${table.pgName} (` +
+				`create table ${service.pgSchema.id}.${table.id} (` +
 				[
 					table.columns.map((column) => 
-					`\n	${column.pgName} ${column.type} not null` + (
+					`\n	${column.id} ${column.type} not null` + (
 						column.flags.hasDefault ? (
 							`\n		default ${column.default}`
 						) : '')
 					).join(','),
 					[
 						`	primary key (` +
-						table.primaryKeys.join(', ') + `)`,
+						table.primaryKeysIds.join(', ') + `)`,
 					].concat(
 						table.uniqueKeys.map((key) =>
 							`	unique (${key.join(', ')})`
@@ -364,26 +491,26 @@ const generateSrc = (fileName) => {
 			`end;\n` +
 			`$$;`,
 			...this.app.services.map((service) => 
-				`--	--	Service ${service.pgName}\n` +
+				`--	--	Service ${service.id}\n` +
 				service.tables.map((table) =>
-					`--	Table ${table.schema.pgName}.${table.pgName}\n` +
+					`--	Table ${service.pgSchema.id}.${table.id}\n` +
 					table.foreignKeys.map((key) =>
-						`alter table ${table.schema.pgName}.${table.pgName}\n`+
-						`add constraint fkey_${table.schema.pgName}_${table.pgName}__${
-							key.columns.join('__')
+						`alter table ${service.pgSchema.id}.${table.id}\n`+
+						`add constraint fkey_${service.pgSchema.id}_${table.id}__${
+							key.columnsIds.join('__')
 						}\n` +
 						`foreign key (\n` +
-						`	${key.columns.join(', ')}\n` +
-						`) references ${key.reference.schema}.${key.reference.table} (\n` +
-						`	${key.reference.columns.join(', ')}\n` +
+						`	${key.columnsIds.join(', ')}\n` +
+						`) references ${key.reference.pgSchemaId}.${key.reference.tableId} (\n` +
+						`	${key.reference.columnsIds.join(', ')}\n` +
 						`);`
 					).concat(
 						table.foreignArrayKeys.map((arrayKey) =>
-							`alter table ${table.schema.pgName}.${table.pgName}\n`+
-							`add constraint array_fkey_${table.schema.pgName}_${table.pgName}__` +
-							`${arrayKey.arrayColumn} check (\n` +
-							`	test.array_fkey_chech(${arrayKey.arrayColumn}::text, ` +
-							`'${arrayKey.reference.schema}.${arrayKey.reference.table}', '${arrayKey.reference.column}')\n` +
+							`alter table ${service.pgSchema.id}.${table.id}\n`+
+							`add constraint array_fkey_${service.pgSchema.id}_${table.id}__` +
+							`${arrayKey.arrayColumnId} check (\n` +
+							`	test.array_fkey_chech(${arrayKey.arrayColumnId}::text, ` +
+							`'${arrayKey.reference.pgSchemaId}.${arrayKey.reference.tableId}', '${arrayKey.reference.columnId}')\n` +
 							`);`
 						)
 					).join('\n')
