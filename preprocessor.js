@@ -171,7 +171,7 @@ const generateSrc = (fileName) => {
 					catchers: catchers,
 					finisher: {
 						route: null,
-						...route.sender
+						...route.finisher
 					},
 				}
 			})
@@ -237,7 +237,7 @@ const generateSrc = (fileName) => {
 		})
 	})
 	//#endregion
-	// log(objectToPrettyText(this.app))
+	log(objectToPrettyText(this.app))
 	// #region Create root dirs
 	if (fs.existsSync(this.rootPath))
 		fs.rmSync(this.rootPath, { recursive: true })
