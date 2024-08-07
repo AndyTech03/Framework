@@ -56,10 +56,10 @@ const getColumnDataType = (column) => {
 }
 
 const getStrOrFalse = (obj) => {
-	if (obj == null)
+	if (obj === null)
 		return 'null'
 
-	if (obj == undefined)
+	if (obj === undefined)
 		return 'undefined'
 
 	if (typeof obj == 'string')

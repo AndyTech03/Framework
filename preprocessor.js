@@ -32,7 +32,9 @@ const generateSrc = (fileName) => {
 		environments: [],
 		imports: [],
 		plugins: [],
+		templates: [],
 		services: [],
+
 		...model.app
 	}
 	// #endregion
@@ -44,12 +46,12 @@ const generateSrc = (fileName) => {
 		let tables = service.tables || []
 		let adapters = service.adapters || []
 		//#region Copmile Templates
-		templates = templates.map((template) => {
-			return {
-				service: null,
-				...template,
-			}
-		})
+		// templates = templates.map((template) => {
+		// 	return {
+		// 		service: null,
+		// 		...template,
+		// 	}
+		// })
 		//#endregion
 		//#region Copmile Tables
 		tables = tables.map((table) => {
@@ -59,20 +61,23 @@ const generateSrc = (fileName) => {
 			const foreignArrayKeys = table.foreignArrayKeys || []
 			const uniqueKeys = table.uniqueKeys || []
 			let columns = table.columns || []
-			let primaryKeysColumns;
 			//#region Compile Columns
 			columns = columns.map((column) => {
 				const columnId = column.id
 
 				return {
-					table: null,
-					id: columnId,
+					"//": undefined,
+					table: undefined,
+					id: undefined,
 					camelCaseName: camelCaseName(columnId),
 					PascalCaseName: PascalCaseName(columnId),
+					type: undefined,
 					dataType: getColumnDataType(column),
 					default: undefined,
 					onUpdate: undefined,
 					nonEditable: undefined,
+					flags: undefined,
+
 					...column,
 					flags: {
 						primaryKey: primaryKeysIds.includes(columnId),
@@ -93,15 +98,19 @@ const generateSrc = (fileName) => {
 				}
 			})
 			//#endregion
-			//#region Filter primaryKeysColumns
-			primaryKeysColumns = columns.filter((column) => 
-				column.flags.primaryKey
-			)
-			//#endregion
+
 			return {
-				service: null,
+				"//": undefined,
+				service: undefined,
+				id: undefined,
 				camelCaseName: camelCaseName(tableId),
 				PascalCaseName: PascalCaseName(tableId),
+				primaryKeysIds: undefined,
+				foreignKeys: undefined,
+				foreignArrayKeys: undefined,
+				uniqueKeys: undefined,
+				columns: undefined,
+
 				...table,
 				primaryKeysIds: primaryKeysIds,
 				foreignKeys: foreignKeys,
@@ -125,21 +134,33 @@ const generateSrc = (fileName) => {
 					const handlerId = handler.id
 
 					return {
-						route: null,
-						rootPath: null,
+						"//": undefined,
+						route: undefined,
+						id: undefined,
 						camelCaseName: camelCaseName(handlerId),
 						PascalCaseName: PascalCaseName(handlerId),
+						rootPath: undefined,
+						maper: undefined,
+						worker: undefined,
+						validator: undefined,
+
 						...handler,
 						maper: {
-							handler: null,
+							"//": undefined,
+							handler: undefined,
+
 							...handler.maper
 						},
 						worker: {
-							handler: null,
+							"//": undefined,
+							handler: undefined,
+							
 							...handler.worker
 						},
 						validator: {
-							handler: null,
+							"//": undefined,
+							handler: undefined,
+
 							...handler.validator
 						}
 					}
@@ -150,27 +171,43 @@ const generateSrc = (fileName) => {
 					const catcherId = catcher.id
 
 					return {
-						route: null,
+						"//": undefined,
+						route: undefined,
+						id: undefined,
 						camelCaseName: camelCaseName(catcherId),
 						PascalCaseName: PascalCaseName(catcherId),
+
 						...catcher,
 					}
 				})
 				//#endregion 
 
 				return {
-					adapter: null,
+					"//": undefined,
+					adapter: undefined,
+					id: undefined,
+					requestJsonSchema: undefined,
 					camelCaseName: camelCaseName(routeId),
 					PascalCaseName: PascalCaseName(routeId),
+					templates: undefined,
+					handlers: undefined,
+					sender: undefined,
+					catchers: undefined,
+					finisher: undefined,
+
 					...route,
 					handlers: handlers,
 					sender: {
-						route: null,
+						"//": undefined,
+						route: undefined,
+
 						...route.sender
 					},
 					catchers: catchers,
 					finisher: {
-						route: null,
+						"//": undefined,
+						route: undefined,
+
 						...route.finisher
 					},
 				}
@@ -178,9 +215,15 @@ const generateSrc = (fileName) => {
 			//#endregion
 			
 			return {
-				service: null,
+				"//": undefined,
+				service: undefined,
+				id: undefined,
 				camelCaseName: camelCaseName(adapterId),
 				PascalCaseName: PascalCaseName(adapterId),
+				rootPath: undefined,
+				templates: undefined,
+				routes: undefined,
+				
 				...adapter,
 				routes,
 			}
@@ -188,15 +231,23 @@ const generateSrc = (fileName) => {
 		//#endregion
 
 		return {
-			app: null,
-			rootPath: null,
+			"//": undefined,
+			app: undefined,
+			id: undefined,
 			camelCaseName: camelCaseName(serviceId),
 			PascalCaseName: PascalCaseName(serviceId),
+			pgSchema: undefined,
+			rootPath: undefined,
+			templates: undefined,
+			tables: undefined,
+			adapters: undefined,
+
 			...service,
 			pgSchema: {
-				id: pgSchemaId,
+				id: undefined,
 				camelCaseName: camelCaseName(pgSchemaId),
 				PascalCaseName: PascalCaseName(pgSchemaId),
+
 				...service.pgSchema,
 			},
 			templates: templates,
@@ -207,9 +258,9 @@ const generateSrc = (fileName) => {
 	this.app.services.map((service) => {
 		service.app = this.app
 		service.rootPath = service.rootPath || `${this.servicesPath}/${service.camelCaseName}`
-		service.templates.map((template) => {
-			template.service = service
-		})
+		// service.templates.map((template) => {
+		// 	template.service = service
+		// })
 		service.tables.map((table) => {
 			table.service = service
 			table.columns.map((column) => {
@@ -237,7 +288,6 @@ const generateSrc = (fileName) => {
 		})
 	})
 	//#endregion
-	log(objectToPrettyText(this.app))
 	// #region Create root dirs
 	if (fs.existsSync(this.rootPath))
 		fs.rmSync(this.rootPath, { recursive: true })
@@ -562,6 +612,7 @@ const generateSrc = (fileName) => {
 	)
 	testsFile.close()
 	//#endregion
+	log(objectToPrettyText(this.app))
 }
 
 
