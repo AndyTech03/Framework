@@ -139,7 +139,6 @@ const generateSrc = (fileName) => {
 						id: undefined,
 						camelCaseName: camelCaseName(handlerId),
 						PascalCaseName: PascalCaseName(handlerId),
-						rootPath: undefined,
 						maper: undefined,
 						worker: undefined,
 						validator: undefined,
