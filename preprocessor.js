@@ -9,13 +9,7 @@ const {
 	getColumnDataType,
 	objectToPrettyText,
 } = require('./utils')
-const {
-	generateHandler,
-	operateHandlerRefs
-} = require('./blueprints/handlers')
-const selectSender = require('./blueprints/senders')
-const selectCatcher = require('./blueprints/catchers')
-const selectFinisher = require('./blueprints/finishers')
+const { generateRoute } = require('./blueprints/routes')
 
 
 const generateSrc = (fileName) => {
@@ -167,14 +161,9 @@ const generateSrc = (fileName) => {
 				//#endregion
 				//#region Compile Catchers
 				catchers = catchers.map((catcher) => {
-					const catcherId = catcher.id
-
 					return {
 						"//": undefined,
 						route: undefined,
-						id: undefined,
-						camelCaseName: camelCaseName(catcherId),
-						PascalCaseName: PascalCaseName(catcherId),
 
 						...catcher,
 					}
@@ -185,9 +174,9 @@ const generateSrc = (fileName) => {
 					"//": undefined,
 					adapter: undefined,
 					id: undefined,
-					requestJsonSchema: undefined,
 					camelCaseName: camelCaseName(routeId),
 					PascalCaseName: PascalCaseName(routeId),
+					requestJsonSchema: undefined,
 					templates: undefined,
 					handlers: undefined,
 					sender: undefined,
@@ -411,26 +400,7 @@ const generateSrc = (fileName) => {
 				`const adapter = (fastify, options, done) => {\n` +
 				`	const client = fastify.postgresql.client\n` +
 				adapter.routes.map((route) =>
-					`	fastify.${route.requestJsonSchema.method}('${route.requestJsonSchema.path}', async (request, reply) => {\n` +
-					`		this.results = []\n` +
-					`		Promise.resolve(\n` +
-					route.handlers.map((handler) => {
-						operateHandlerRefs(handler)
-						return generateHandler(handler, 2)
-					}).join('\n') + '\n' +
-					`		).then(() => {\n` +
-					selectSender(route.sender, 2) +
-					`		}` +
-					route.catchers.map((catcher) =>
-								`).catch((error) => {\n` +
-						selectCatcher(catcher, 2) +
-						`		}`
-					).join('') +
-							`).finally(() => {\n` +
-					selectFinisher(route.finisher, 2) +
-					`		})\n` +
-					`		return reply\n` +
-					`	})`
+					generateRoute(route, 1)
 				).join(`\n\n`) + `\n` +
 				`\n` +
 				`	done()\n` +
